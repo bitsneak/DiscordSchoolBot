@@ -1,5 +1,6 @@
 package at.htlle.discord.jpa.entity;
 
+import at.htlle.discord.model.enums.Years;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,5 +23,5 @@ public class Year {
     @Column(name = "year", nullable = false, unique = true)
     @Enumerated(EnumType.STRING)
     @NonNull
-    private at.htlle.discord.model.enums.Year year;
+    private Years year;
 }

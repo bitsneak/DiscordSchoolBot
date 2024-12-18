@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum Profession {
+public enum Professions {
     IT("IT"),
     L("L"),
     M("M"),

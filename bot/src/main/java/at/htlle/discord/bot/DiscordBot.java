@@ -2,7 +2,7 @@ package at.htlle.discord.bot;
 
 import at.htlle.discord.jpa.entity.Client;
 import at.htlle.discord.model.VerificationClient;
-import at.htlle.discord.model.enums.VerificationState;
+import at.htlle.discord.model.enums.VerificationStates;
 import at.htlle.discord.service.DiscordService;
 import jakarta.annotation.PostConstruct;
 import net.dv8tion.jda.api.JDA;
@@ -36,7 +36,7 @@ public class DiscordBot extends ListenerAdapter {
     private String discordToken;
 
     @Value("${discord.channel.log.name}")
-    private String adminChannelName;
+    private String logChannelName;
 
     @PostConstruct
     public void initBot() throws Exception {
@@ -61,10 +61,10 @@ public class DiscordBot extends ListenerAdapter {
 
         jda.getGuilds().stream()
                 .flatMap(guild -> guild.getTextChannels().stream())
-                .filter(channel -> channel.getName().equals(adminChannelName))
+                .filter(channel -> channel.getName().equals(logChannelName))
                 .findFirst()
                 .ifPresent(channel -> {
-                    discordService.setAdminChannel(channel);
+                    discordService.setLogChannel(channel);
                     logger.info("Admin channel found: {}", channel.getName());
                 });
     }
@@ -72,19 +72,24 @@ public class DiscordBot extends ListenerAdapter {
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
         User user = event.getUser();
-        System.out.println(user.getName());
         pendingVerifications.add(new VerificationClient(user, new Client()));
 
         discordService.sendPrivateMessage(user, "Welcome to the server! Please reply with your school email address for verification.");
-        logger.info("New member joined: {}", user.getName());
+        logger.info("New member joined: {}", user.getIdLong());
 
     }
 
     @Override
     public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
         User user = event.getUser();
-        discordService.setClientLeftAt(user);
-        discordService.sendJsonToAdminChannel();
+
+        pendingVerifications.stream()
+                .filter(vc -> vc.getUser().equals(user))
+                .findFirst().
+                ifPresentOrElse(pendingVerifications::remove, () -> {
+            discordService.setClientLeftAt(user);
+            discordService.sendJsonToAdminChannel();
+        });
 
         logger.info("Member removed: {}", user.getIdLong());
     }
@@ -102,22 +107,22 @@ public class DiscordBot extends ListenerAdapter {
                 switch (verificationClient.getState()) {
                     case AWAITING_EMAIL -> {
                         if (discordService.handleEmailInput(verificationClient, input)) {
-                            verificationClient.setState(VerificationState.AWAITING_CODE);
+                            verificationClient.setState(VerificationStates.AWAITING_CODE);
                         }
                     }
                     case AWAITING_CODE -> {
                         if (discordService.handleCodeInput(verificationClient, input)) {
-                            verificationClient.setState(VerificationState.AWAITING_PROFESSION);
+                            verificationClient.setState(VerificationStates.AWAITING_PROFESSION);
                         }
                     }
                     case AWAITING_PROFESSION -> {
                         if (discordService.handleProfessionInput(verificationClient, input)) {
-                            verificationClient.setState(VerificationState.AWAITING_CLASS);
+                            verificationClient.setState(VerificationStates.AWAITING_CLASS);
                         }
                     }
                     case AWAITING_CLASS -> {
                         if (discordService.handleClassInput(verificationClient, input)) {
-                            logger.info("User {} has been successfully verified. Assigning roles", user.getIdLong());
+                            logger.info("User {} has been successfully verified.", user.getIdLong());
                             discordService.assignRoles(verificationClient);
                             logger.info("Roles assigned to user {}", user.getIdLong());
                             discordService.persistClient(verificationClient);

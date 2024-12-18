@@ -5,12 +5,9 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum Year {
-    ONE("1"),
-    TWO("2"),
-    THREE("3"),
-    FOUR("4"),
-    FIVE("5");
+public enum Roles {
+    TEACHER("Lehrer"),
+    STUDENT("Schüler");
 
     private final String name;
 }

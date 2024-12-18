@@ -5,7 +5,7 @@ import lombok.Getter;
 
 @Getter
 @AllArgsConstructor
-public enum Enrolment {
+public enum Enrolments {
     FOUR_AIT("4AIT"),
     FOUR_BIT("4BIT"),
     FOUR_RL("4RL"),

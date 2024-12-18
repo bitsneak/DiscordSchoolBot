@@ -1,10 +1,13 @@
 package at.htlle.discord.jpa.repository;
 
 import at.htlle.discord.jpa.entity.Enrolment;
+import at.htlle.discord.model.enums.Enrolments;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 public interface EnrolmentRepository extends JpaRepository<Enrolment, Long> {
-    Enrolment findByName(at.htlle.discord.model.enums.Enrolment name);
+    Optional<Enrolment> findByName(Enrolments name);
 }

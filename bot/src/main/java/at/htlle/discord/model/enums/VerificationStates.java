@@ -1,6 +1,6 @@
 package at.htlle.discord.model.enums;
 
-public enum VerificationState {
+public enum VerificationStates {
     AWAITING_EMAIL,
     AWAITING_CODE,
     AWAITING_PROFESSION,

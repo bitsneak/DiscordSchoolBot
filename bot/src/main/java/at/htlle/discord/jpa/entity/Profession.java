@@ -1,5 +1,6 @@
 package at.htlle.discord.jpa.entity;
 
+import at.htlle.discord.model.enums.Professions;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,5 +23,5 @@ public class Profession
     @Column(name = "name", nullable = false, unique = true)
     @Enumerated(EnumType.STRING)
     @NonNull
-    private at.htlle.discord.model.enums.Profession name;
+    private Professions name;
 }
