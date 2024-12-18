@@ -1,16 +1,15 @@
-package at.htlle.discord.entity;
+package at.htlle.discord.model.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+@Getter
 @AllArgsConstructor
-public enum Profession
-{
+public enum Profession {
     IT("IT"),
     L("L"),
     M("M"),
     R("R");
 
-    @Getter
     private final String name;
 }
