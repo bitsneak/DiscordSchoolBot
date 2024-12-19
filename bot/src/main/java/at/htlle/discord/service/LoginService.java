@@ -29,8 +29,8 @@ import java.util.Optional;
 import java.util.function.BiConsumer;
 
 @Service
-public class DiscordService {
-    private static final Logger logger = LogManager.getLogger(DiscordService.class);
+public class LoginService {
+    private static final Logger logger = LogManager.getLogger(LoginService.class);
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
@@ -54,7 +54,7 @@ public class DiscordService {
     private EnrolmentRepository enrolmentRepository;
 
     @Autowired
-    private YearRepository yearRepository;
+    private TeacherRepository teacherRepository;
 
     @Autowired
     private ProfessionRepository professionRepository;
@@ -110,6 +110,7 @@ public class DiscordService {
             Professions professionEnum = Professions.valueOf(profession.toUpperCase());
             Client client = verificationClient.getClient();
 
+            // find or create profession
             professionRepository.findByName(professionEnum).ifPresentOrElse(
                     client::setProfession,
                     () -> {
@@ -119,7 +120,7 @@ public class DiscordService {
                     }
             );
 
-            sendPrivateMessage(verificationClient.getUser(), "Please enter your class name.");
+            sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
             logger.info("Profession found for user: {}", verificationClient.getUser().getIdLong());
             return true;
         }
@@ -128,55 +129,23 @@ public class DiscordService {
         return false;
     }
 
-    public boolean handleClassInput(VerificationClient verificationClient, String className) {
-        // check if the className matches any enrolment enum
-        Optional<Enrolments> enrolmentEnumOptional = Arrays.stream(Enrolments.values())
-                .filter(e -> e.getName().equalsIgnoreCase(className))
-                .findFirst();
+    public boolean handleTeacherInput(VerificationClient verificationClient, String abbreviation) {
+        // check if the teacher abbreviation matches any teacher
+        Optional<Teacher> teacherOptional = teacherRepository.findByAbbreviation(abbreviation);
 
-        if (enrolmentEnumOptional.isPresent()) {
-            // get enum enrolment from class name
-            Enrolments enrolmentEnum = enrolmentEnumOptional.get();
+        if (teacherOptional.isPresent()) {
+            // get teacher from optional
+            Teacher teacher = teacherOptional.get();
+            // get enrolment by teacher
+            Enrolment enrolment = enrolmentRepository.findByClassTeacher(teacher).get();
+            // set class
+            verificationClient.getClient().setEnrolment(enrolment);
 
-            // first character of the class name is always the year
-            String yearString = String.valueOf(className.charAt(0));
-
-            // find the corresponding year enum
-            Optional<Years> yearEnumOptional = Arrays.stream(Years.values())
-                    .filter(y -> y.getName().equals(yearString))
-                    .findFirst();
-
-            if (yearEnumOptional.isPresent()) {
-                Years yearEnum = yearEnumOptional.get();
-                Client client = verificationClient.getClient();
-
-                // find or create the enrolment entity
-                enrolmentRepository.findByName(enrolmentEnum).ifPresentOrElse(
-                        // if enrolment exists, set it to the client
-                        client::setEnrolment,
-                        // if enrolment does not exist, create it and set it to the client
-                        () -> {
-                            // find or create the year entity
-                            Year year = yearRepository.findByYear(yearEnum)
-                                    .orElseGet(() -> yearRepository.save(new Year(yearEnum)));
-
-                            // create and save the enrolment entity
-                            Enrolment enrolmentEntity = new Enrolment(enrolmentEnum, year);
-                            enrolmentRepository.save(enrolmentEntity);
-
-                            // set the new enrolment to the client
-                            client.setEnrolment(enrolmentEntity);
-                        }
-                );
-                logger.info("Class found for user: {}", verificationClient.getUser().getIdLong());
-                return true;
-            } else {
-                sendPrivateMessage(verificationClient.getUser(), "Invalid year in the class name.");
-                return false;
-            }
+            logger.info("Class found for user: {}", verificationClient.getUser().getIdLong());
+            return true;
         }
 
-        sendPrivateMessage(verificationClient.getUser(), "Invalid class name. Please enter a valid class name.");
+        sendPrivateMessage(verificationClient.getUser(), "Invalid class teacher abbreviation. Please enter a valid class teacher abbreviation.");
         return false;
     }
 
@@ -219,7 +188,7 @@ public class DiscordService {
             );
 
             // assign client className to user role
-            assignRole.accept(user, client.getEnrolment().getName().getName());
+            assignRole.accept(user, client.getEnrolment().getName());
             // assign client year to user role
             assignRole.accept(user, "Jahrgang " + client.getEnrolment().getYear().getYear().getName());
         }

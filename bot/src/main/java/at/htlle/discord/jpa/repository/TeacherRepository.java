@@ -1,6 +1,5 @@
 package at.htlle.discord.jpa.repository;
 
-import at.htlle.discord.jpa.entity.Enrolment;
 import at.htlle.discord.jpa.entity.Teacher;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -8,7 +7,6 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface EnrolmentRepository extends JpaRepository<Enrolment, Long> {
-    Optional<Enrolment> findByName(String name);
-    Optional<Enrolment> findByClassTeacher(Teacher teacher);
+public interface TeacherRepository extends JpaRepository<Teacher, Long> {
+    Optional<Teacher> findByAbbreviation(String abbreviation);
 }

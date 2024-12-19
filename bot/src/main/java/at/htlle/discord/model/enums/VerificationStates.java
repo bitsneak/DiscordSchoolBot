@@ -4,5 +4,5 @@ public enum VerificationStates {
     AWAITING_EMAIL,
     AWAITING_CODE,
     AWAITING_PROFESSION,
-    AWAITING_CLASS,
+    AWAITING_CLASS_TEACHER,
 }

@@ -1,6 +1,5 @@
 package at.htlle.discord.jpa.entity;
 
-import at.htlle.discord.model.enums.Enrolments;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,9 +20,13 @@ public class Enrolment {
     private Long id;
 
     @Column(name = "name", nullable = false, unique = true)
-    @Enumerated(EnumType.STRING)
     @NonNull
-    private Enrolments name;
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "class_teacher_id", nullable = false, unique = true)
+    @NonNull
+    private Teacher classTeacher;
 
     @ManyToOne
     @JoinColumn(name = "year_id", nullable = false)
