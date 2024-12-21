@@ -1,6 +1,6 @@
 package at.htlle.discord.jpa.entity;
 
-import at.htlle.discord.model.enums.Roles;
+import at.htlle.discord.model.enums.Scholars;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -13,7 +13,7 @@ import lombok.*;
 @AllArgsConstructor
 @EqualsAndHashCode
 @ToString
-public class Role
+public class Scholar
 {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -23,5 +23,5 @@ public class Role
     @Column(name = "name", nullable = false, unique = true)
     @Enumerated(EnumType.STRING)
     @NonNull
-    private Roles name;
+    private Scholars name;
 }

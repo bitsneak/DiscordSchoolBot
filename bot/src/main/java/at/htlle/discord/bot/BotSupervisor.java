@@ -1,6 +1,7 @@
 package at.htlle.discord.bot;
 
 import at.htlle.discord.model.enums.BotCommands;
+import at.htlle.discord.util.DiscordUtil;
 import jakarta.annotation.PostConstruct;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -36,6 +37,9 @@ public class BotSupervisor extends ListenerAdapter {
     @Autowired
     private CommandInitializer commandInitializer;
 
+    @Autowired
+    private DiscordUtil discordUtil;
+
     @Value("${discord.channel.log.name}")
     private String logChannelName;
 
@@ -69,7 +73,7 @@ public class BotSupervisor extends ListenerAdapter {
         jda.getGuilds().forEach(guild -> {
             guild.getTextChannels().forEach(channel -> {
                 if (channel.getName().equals(logChannelName)) {
-                    loginBot.getLoginService().setLogChannel(channel);
+                    discordUtil.setLogChannel(channel);
                     logger.info("Login channel set: {}", channel.getName());
                 }
 

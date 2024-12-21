@@ -5,10 +5,11 @@ import at.htlle.discord.jpa.repository.*;
 import at.htlle.discord.model.enums.*;
 import at.htlle.discord.model.VerificationClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.transaction.Transactional;
 import lombok.Setter;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.utils.FileUpload;
@@ -17,6 +18,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.awt.*;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -32,14 +34,9 @@ import java.util.function.BiConsumer;
 public class LoginService {
     private static final Logger logger = LogManager.getLogger(LoginService.class);
 
-    private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'");
-
     private static final String EMAIL_REGEX = "^[a-zA-Z0-9._%+-]+@o365\\.htl-leoben\\.at$";
 
     private static final String EMAIL_TEACHER_REGEX = "^[a-z]+@o365\\.htl-leoben\\.at$";
-
-    @Setter
-    private TextChannel logChannel;
 
     @Autowired
     private VerificationService verificationService;
@@ -60,10 +57,7 @@ public class LoginService {
     private ProfessionRepository professionRepository;
 
     @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    private ScholarRepository scholarRepository;
 
     public void sendPrivateMessage(User user, String message) {
         user.openPrivateChannel().queue(channel -> channel.sendMessage(message).queue());
@@ -80,7 +74,7 @@ public class LoginService {
         verificationClient.getClient().setEmail(email);
 
         sendPrivateMessage(verificationClient.getUser(), "A verification code has been sent to your email. Please enter the code.");
-        logger.info("Verification email sent to user: {}", verificationClient.getUser().getIdLong());
+        logger.info("Verification email sent to user: {}", verificationClient.getUser().getId());
 
         return true;
     }
@@ -96,7 +90,7 @@ public class LoginService {
 
         if (isCodeValid) {
             sendPrivateMessage(verificationClient.getUser(), "Please enter your profession. One out of " + Arrays.toString(Professions.values()));
-            logger.info("Code found for user: {}. Entered email is correct.", verificationClient.getUser().getIdLong());
+            logger.info("Code found for user: {}. Entered email is correct.", verificationClient.getUser().getId());
             return true;
         }
 
@@ -121,7 +115,7 @@ public class LoginService {
             );
 
             sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
-            logger.info("Profession found for user: {}", verificationClient.getUser().getIdLong());
+            logger.info("Profession found for user: {}", verificationClient.getUser().getId());
             return true;
         }
 
@@ -131,120 +125,141 @@ public class LoginService {
 
     public boolean handleTeacherInput(VerificationClient verificationClient, String abbreviation) {
         // check if the teacher abbreviation matches any teacher
-        Optional<Teacher> teacherOptional = teacherRepository.findByAbbreviation(abbreviation);
+        Optional<Teacher> teacherOptional = teacherRepository.findByAbbreviation(abbreviation.toUpperCase());
 
         if (teacherOptional.isPresent()) {
             // get teacher from optional
             Teacher teacher = teacherOptional.get();
-            // get enrolment by teacher
-            Enrolment enrolment = enrolmentRepository.findByClassTeacher(teacher).get();
-            // set class
-            verificationClient.getClient().setEnrolment(enrolment);
 
-            logger.info("Class found for user: {}", verificationClient.getUser().getIdLong());
+            // get enrolment by teacher
+            Optional<Enrolment> enrolmentOptional = enrolmentRepository.findByClassTeacher(teacher);
+            // no enrolment found for this class teacher
+            if (enrolmentOptional.isEmpty()) {
+                sendPrivateMessage(verificationClient.getUser(), "No class registered for this teacher.");
+                sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
+                logger.info("No class found for teacher: {}", teacher.getAbbreviation());
+                return false;
+            }
+
+            // if enrolment is found, set it on the client
+            Enrolment enrolment = enrolmentOptional.get();
+            verificationClient.getClient().setEnrolment(enrolment);
+            logger.info("Class found for user: {}", verificationClient.getUser().getId());
             return true;
         }
 
-        sendPrivateMessage(verificationClient.getUser(), "Invalid class teacher abbreviation. Please enter a valid class teacher abbreviation.");
+        sendPrivateMessage(verificationClient.getUser(), "Invalid or not supported class teacher abbreviation.");
         return false;
     }
 
     public void assignRoles(VerificationClient verificationClient) {
         User user = verificationClient.getUser();
         Client client = verificationClient.getClient();
-        Guild guild = logChannel.getGuild();
+        Guild guild = verificationClient.getGuild();
         Member member = guild.retrieveMember(user).complete();
 
+        // discord colors
+        Color itProffesionColor = Color.decode("#f0c50f");
+        Color lProffesionColor = Color.decode("#9a59b7");
+        Color mProffesionColor = Color.decode("#3599db");
+        Color rProffesionColor = Color.decode("#2ecc71");
+        Color genericRoleColor = Color.decode("#94a5a7");
+        Color classRoleColor = Color.decode("#e64c3d");
+
         // Helper method to assign a role by name
-        BiConsumer<User, String> assignRole = (u, roleName) ->
-                guild.getRolesByName(roleName, true).stream()
-                        .findFirst()
-                        .ifPresentOrElse(
-                                role -> guild.addRoleToMember(member, role).queue(
-                                        success -> logger.info("Successfully assigned role {} to user {}", role.getName(), u.getIdLong()),
-                                        error -> logger.error("Failed to assign role {} to user {}. Error: {}", role.getName(), u.getIdLong(), error.getMessage())
-                                ),
-                                () -> logger.warn("Role {} not found in guild.", roleName)
+        BiConsumer<String, Color> createAndAssignRole = (roleName, color) -> {
+            Optional<Role> existingRole = guild.getRolesByName(roleName, true).stream().findFirst();
+
+            if (existingRole.isPresent()) {
+                // If the role exists, assign it
+                guild.addRoleToMember(member, existingRole.get()).queue(
+                        success -> logger.info("Successfully assigned existing role {} to user {}", roleName, user.getId()),
+                        error -> logger.error("Failed to assign existing role {} to user {}. Error: {}", roleName, user.getId(), error.getMessage())
+                );
+            } else {
+                // If the role doesn't exist, create it and then assign it
+                guild.createRole()
+                        .setName(roleName)
+                        .setColor(color)
+                        .setMentionable(true)
+                        .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
+                        .queue(
+                                role -> {
+                                    guild.addRoleToMember(member, role).queue(
+                                            success -> logger.info("Created and assigned new role {} to user {}", roleName, user.getId()),
+                                            error -> logger.error("Failed to assign new role {} to user {}. Error: {}", roleName, user.getId(), error.getMessage())
+                                    );
+                                },
+                                error -> logger.error("Failed to create role {}. Error: {}", roleName, error.getMessage())
                         );
+            }
+        };
+
+        // assign client profession to user role
+        Professions profession = client.getProfession().getName();
+        switch (profession) {
+            case IT -> createAndAssignRole.accept(profession.getName(), itProffesionColor);
+            case L -> createAndAssignRole.accept(profession.getName(), lProffesionColor);
+            case M -> createAndAssignRole.accept(profession.getName(), mProffesionColor);
+            case R -> createAndAssignRole.accept(profession.getName(), rProffesionColor);
+        }
 
         // select if teacher or student
         if (client.getEmail().matches(EMAIL_TEACHER_REGEX)) {
             // find or create teacher role
-            roleRepository.findByName(Roles.TEACHER).ifPresentOrElse(
-                    client::setRole,
+            scholarRepository.findByName(Scholars.TEACHER).ifPresentOrElse(
+                    c -> {
+                        createAndAssignRole.accept(c.getName().getName(), genericRoleColor);
+                        client.setScholar(c);
+                    },
                     () -> {
-                        Role role = roleRepository.save(new Role(Roles.TEACHER));
-                        client.setRole(role);
+                        Scholar role = scholarRepository.save(new Scholar(Scholars.TEACHER));
+                        createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
+                        client.setScholar(role);
                     }
             );
         } else {
             // find or create student role
-            roleRepository.findByName(Roles.STUDENT).ifPresentOrElse(
-                    client::setRole,
+            scholarRepository.findByName(Scholars.STUDENT).ifPresentOrElse(
+                    c -> {
+                        createAndAssignRole.accept(c.getName().getName(), genericRoleColor);
+                        client.setScholar(c);
+                    },
                     () -> {
-                        Role role = roleRepository.save(new Role(Roles.STUDENT));
-                        client.setRole(role);
+                        Scholar role = scholarRepository.save(new Scholar(Scholars.STUDENT));
+                        createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
+                        client.setScholar(role);
                     }
             );
 
-            // assign client className to user role
-            assignRole.accept(user, client.getEnrolment().getName());
             // assign client year to user role
-            assignRole.accept(user, "Jahrgang " + client.getEnrolment().getYear().getYear().getName());
+            createAndAssignRole.accept("Jahrgang " + client.getEnrolment().getYear().getYear().getYear(), genericRoleColor);
+            // assign client className to user role
+            createAndAssignRole.accept(client.getEnrolment().getName(), classRoleColor);
         }
-
-        // assign client role to user role
-        assignRole.accept(user, client.getRole().getName().getName());
-        // assign client profession to user role
-        assignRole.accept(user, client.getProfession().getName().getName());
 
         sendPrivateMessage(verificationClient.getUser(), "You have been successfully verified. Welcome!");
     }
 
-    @Transactional
     public void persistClient(VerificationClient verificationClient) {
         Client client = verificationClient.getClient();
         User user = verificationClient.getUser();
 
-        clientRepository.findByDiscordId(user.getIdLong()).ifPresentOrElse(
+        clientRepository.findByDiscordId(user.getId()).ifPresentOrElse(
                 existingClient -> {
                     existingClient.setEmail(client.getEmail());
                     existingClient.setProfession(client.getProfession());
                     existingClient.setEnrolment(client.getEnrolment());
-                    existingClient.setRole(client.getRole());
+                    existingClient.setScholar(client.getScholar());
                     existingClient.setJoinedAt(LocalDateTime.now(ZoneOffset.UTC));
-                    existingClient.setLeftAt(null);
                     clientRepository.save(existingClient);
                 },
                 () -> {
-                    client.setDiscordId(user.getIdLong());
+                    client.setDiscordId(user.getId());
                     client.setDiscordName(user.getName());
                     client.setJoinedAt(LocalDateTime.now(ZoneOffset.UTC));
                     clientRepository.save(client);
                 }
         );
-    }
-
-    @Transactional
-    public void setClientLeftAt(User user) {
-        Client client = clientRepository.findByDiscordId(user.getIdLong()).get();
-
-        client.setLeftAt(LocalDateTime.now(ZoneOffset.UTC));
-        clientRepository.save(client);
-    }
-
-    public void sendJsonToAdminChannel() {
-        String timestamp = LocalDateTime.now(ZoneOffset.UTC).format(DATE_TIME_FORMATTER);
-        logger.info("Sending JSON to admin channel with timestamp: {}", timestamp);
-        List<Client> clients = clientRepository.findAll();
-
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(byteArrayOutputStream, clients);
-            byte[] content = byteArrayOutputStream.toByteArray();
-            logChannel.sendFiles(Collections.singletonList(FileUpload.fromData(content, "user_data-" + timestamp.replace(":", "_") + ".json"))).queue();
-            logger.info("JSON file sent to admin channel successfully.");
-        } catch (IOException e) {
-            logger.error("Error while sending JSON to admin channel: {}", e.getMessage(), e);
-        }
     }
 }

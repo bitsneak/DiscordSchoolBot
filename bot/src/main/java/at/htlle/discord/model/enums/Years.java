@@ -12,5 +12,20 @@ public enum Years {
     FOUR("4"),
     FIVE("5");
 
-    private final String name;
+    private final String year;
+
+    // get the next year
+    public Years getNextYear() {
+        // next year's value is one higher than this year's
+        int nextYearValue = Integer.parseInt(this.year) + 1;
+
+        // find if a next year exists
+        for (Years y : Years.values()) {
+            if (Integer.parseInt(y.getYear()) == nextYearValue) {
+                return y;
+            }
+        }
+        // return null if there is no next year
+        return null;
+    }
 }

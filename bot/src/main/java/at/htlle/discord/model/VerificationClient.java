@@ -3,6 +3,7 @@ package at.htlle.discord.model;
 import at.htlle.discord.jpa.entity.Client;
 import at.htlle.discord.model.enums.VerificationStates;
 import lombok.*;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.User;
 
 import java.sql.Timestamp;
@@ -17,6 +18,9 @@ public class VerificationClient {
 
     @NonNull
     private VerificationStates state = VerificationStates.AWAITING_EMAIL;
+
+    @NonNull
+    private Guild guild;
 
     @NonNull
     private User user;

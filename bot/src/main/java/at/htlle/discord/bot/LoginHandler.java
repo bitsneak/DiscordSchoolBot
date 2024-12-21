@@ -1,10 +1,13 @@
 package at.htlle.discord.bot;
 
 import at.htlle.discord.jpa.entity.Client;
+import at.htlle.discord.jpa.repository.ClientRepository;
 import at.htlle.discord.model.VerificationClient;
 import at.htlle.discord.model.enums.VerificationStates;
 import at.htlle.discord.service.LoginService;
+import at.htlle.discord.util.DiscordUtil;
 import lombok.Getter;
+import lombok.Setter;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
@@ -28,13 +31,19 @@ public class LoginHandler extends ListenerAdapter {
     @Getter
     private LoginService loginService;
 
+    @Autowired
+    private ClientRepository clientRepository;
+
+    @Autowired
+    private DiscordUtil discordUtil;
+
     @Override
     public void onGuildMemberJoin(GuildMemberJoinEvent event) {
         User user = event.getUser();
-        pendingVerifications.add(new VerificationClient(user, new Client()));
+        pendingVerifications.add(new VerificationClient(event.getGuild(), user, new Client()));
 
         loginService.sendPrivateMessage(user, "Welcome to the server! Please reply with your school email address for verification.");
-        logger.info("New member joined: {}", user.getIdLong());
+        logger.info("New member joined: {}", user.getId());
 
     }
 
@@ -42,15 +51,23 @@ public class LoginHandler extends ListenerAdapter {
     public void onGuildMemberRemove(GuildMemberRemoveEvent event) {
         User user = event.getUser();
 
+        // check if the user has a pending verification and remove them if necessary
         pendingVerifications.stream()
                 .filter(vc -> vc.getUser().equals(user))
-                .findFirst().
-                ifPresentOrElse(pendingVerifications::remove, () -> {
-                    loginService.setClientLeftAt(user);
-                    loginService.sendJsonToAdminChannel();
-                });
+                .findFirst()
+                .ifPresentOrElse(
+                        pendingVerifications::remove,
+                        () -> {
+                            // delete the client from the database if they exist
+                            clientRepository.findByDiscordId(user.getId()).ifPresent(client -> {
+                                clientRepository.delete(client);
+                                logger.info("Removed client: {}", user.getId());
+                            });
 
-        logger.info("Member removed: {}", user.getIdLong());
+                            // Only send the JSON update if it is not part of the rotation process
+                            discordUtil.sendJsonToLogChannel();
+                        }
+                );
     }
 
     @Override
@@ -84,14 +101,14 @@ public class LoginHandler extends ListenerAdapter {
                 }
                 case AWAITING_CLASS_TEACHER -> {
                     if (loginService.handleTeacherInput(verificationClient, input)) {
-                        logger.info("User {} has been successfully verified.", user.getIdLong());
+                        logger.info("User {} has been successfully verified.", user.getId());
                         loginService.assignRoles(verificationClient);
-                        logger.info("Roles assigned to user {}", user.getIdLong());
+                        logger.info("Roles assigned to user {}", user.getId());
                         loginService.persistClient(verificationClient);
                         // client is now persisted, therefore remove from pending verifications
                         pendingVerifications.remove(verificationClient);
                         logger.info("Client {} persisted to database", verificationClient.getClient().getId());
-                        loginService.sendJsonToAdminChannel();
+                        discordUtil.sendJsonToLogChannel();
                         logger.info("Sent client data for client {} to admin channel", verificationClient.getClient().getId());
                     }
                 }

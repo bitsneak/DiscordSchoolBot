@@ -1,5 +1,6 @@
 package at.htlle.discord.jpa.entity;
 
+import at.htlle.discord.model.enums.Years;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -32,4 +33,12 @@ public class Enrolment {
     @JoinColumn(name = "year_id", nullable = false)
     @NonNull
     private Year year;
+
+    public void updateNameWithYear(Years newYear) {
+        String currentName = getName();
+        // extract the current class suffix
+        String suffix = currentName.substring(1);
+        // update the name with the new year
+        setName(newYear.getYear() + suffix);
+    }
 }
