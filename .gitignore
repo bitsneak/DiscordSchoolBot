@@ -27,8 +27,14 @@
 ### Eclipse IDEA ###
 .metadata
 
+### Maven ###
+.m2
+
 ### Logging ###
 *.log
+
+### Environment ###
+.env
 
 ### Database ###
 db/

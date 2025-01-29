@@ -143,7 +143,7 @@ public class CommandService {
                 );
     }
 
-    private synchronized void handleRotate(SlashCommandInteractionEvent event) {
+    private void handleRotate(SlashCommandInteractionEvent event) {
         // get all enrolments
         List<Enrolment> allEnrolments = enrolmentRepository.findAll();
         Guild guild = event.getGuild();
