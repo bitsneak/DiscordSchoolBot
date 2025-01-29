@@ -36,9 +36,6 @@ public class CommandService {
     private TextChannel commandChannel;
 
     @Autowired
-    private LoginHandler loginHandler;
-
-    @Autowired
     private ClientRepository clientRepository;
 
     @Autowired

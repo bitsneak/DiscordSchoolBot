@@ -17,7 +17,7 @@ import java.sql.Timestamp;
 public class VerificationClient {
 
     @NonNull
-    private VerificationStates state = VerificationStates.AWAITING_EMAIL;
+    private VerificationStates state = VerificationStates.AWAIT_EMAIL;
 
     @NonNull
     private Guild guild;

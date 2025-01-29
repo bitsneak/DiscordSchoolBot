@@ -3,9 +3,7 @@ version: '3.8'
 services:
   db:
     image: mysql:8.0.29
-    environment:
-      MYSQL_ROOT_PASSWORD: 123
-      MYSQL_DATABASE: user
+    env_file: .env
     restart: unless-stopped
     volumes:
       - ./db:/var/lib/mysql:rw

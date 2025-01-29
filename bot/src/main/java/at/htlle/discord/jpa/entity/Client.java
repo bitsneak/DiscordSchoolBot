@@ -7,7 +7,12 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "client")
+@Table(name = "client", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "enrolment_id", "profession_id", "scholar_id", "joined_at"}),
+        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "profession_id", "scholar_id", "joined_at"}),
+        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "enrolment_id", "profession_id", "scholar_id", "joined_at", "left_at"}),
+        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "profession_id", "scholar_id", "joined_at", "left_at"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,10 +39,8 @@ public class Client
     @NonNull
     private String email;
 
-    // TODO make it optional so teachers can also join
     @ManyToOne
-    @JoinColumn(name = "enrolment_id", nullable = false)
-    @NonNull
+    @JoinColumn(name = "enrolment_id")
     private Enrolment enrolment;
 
     @ManyToOne
@@ -46,7 +49,7 @@ public class Client
     private Profession profession;
 
     @ManyToOne
-    @JoinColumn(name = "role_id", nullable = false)
+    @JoinColumn(name = "scholar_id", nullable = false)
     @NonNull
     private Scholar scholar;
 
@@ -54,4 +57,8 @@ public class Client
     @NonNull
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
     private LocalDateTime joinedAt;
+
+    @Column(name = "left_at")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss'Z'")
+    private LocalDateTime leftAt;
 }

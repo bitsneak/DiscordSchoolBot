@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "class")
+@Table(name = "class", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"name", "teacher_id", "email", "year_id"})
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -25,7 +27,7 @@ public class Enrolment {
     private String name;
 
     @ManyToOne
-    @JoinColumn(name = "class_teacher_id", nullable = false, unique = true)
+    @JoinColumn(name = "teacher_id", nullable = false, unique = true)
     @NonNull
     private Teacher classTeacher;
 

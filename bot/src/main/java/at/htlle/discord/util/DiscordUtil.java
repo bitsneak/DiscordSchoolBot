@@ -5,6 +5,7 @@ import at.htlle.discord.jpa.repository.ClientRepository;
 import at.htlle.discord.service.LoginService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Setter;
+import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.utils.FileUpload;
 import org.apache.logging.log4j.LogManager;
@@ -35,6 +36,10 @@ public class DiscordUtil {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    public void sendPrivateMessage(User user, String message) {
+        user.openPrivateChannel().queue(channel -> channel.sendMessage(message).queue());
+    }
 
     public void sendJsonToLogChannel() {
         String timestamp = LocalDateTime.now(ZoneOffset.UTC).format(DATE_TIME_FORMATTER);

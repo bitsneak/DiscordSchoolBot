@@ -3,11 +3,11 @@ package at.htlle.discord.bot;
 import at.htlle.discord.jpa.entity.Client;
 import at.htlle.discord.jpa.repository.ClientRepository;
 import at.htlle.discord.model.VerificationClient;
+import at.htlle.discord.model.enums.Scholars;
 import at.htlle.discord.model.enums.VerificationStates;
 import at.htlle.discord.service.LoginService;
 import at.htlle.discord.util.DiscordUtil;
 import lombok.Getter;
-import lombok.Setter;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
@@ -19,6 +19,8 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 
 @Component
@@ -42,7 +44,7 @@ public class LoginHandler extends ListenerAdapter {
         User user = event.getUser();
         pendingVerifications.add(new VerificationClient(event.getGuild(), user, new Client()));
 
-        loginService.sendPrivateMessage(user, "Welcome to the server! Please reply with your school email address for verification.");
+        discordUtil.sendPrivateMessage(user, "Welcome to the server! Please reply with your school email address for verification.");
         logger.info("New member joined: {}", user.getId());
 
     }
@@ -60,14 +62,36 @@ public class LoginHandler extends ListenerAdapter {
                         () -> {
                             // delete the client from the database if they exist
                             clientRepository.findByDiscordId(user.getId()).ifPresent(client -> {
-                                clientRepository.delete(client);
+                                client.setLeftAt(LocalDateTime.now(ZoneOffset.UTC));
+                                clientRepository.save(client);
                                 logger.info("Removed client: {}", user.getId());
                             });
 
-                            // Only send the JSON update if it is not part of the rotation process
+                            // only send the JSON update if it is not part of the rotation process
                             discordUtil.sendJsonToLogChannel();
                         }
                 );
+    }
+
+    private void assignRoles(VerificationClient verificationClient) {
+        User user = verificationClient.getUser();
+
+        // assign roles
+        loginService.assignRoles(verificationClient);
+        logger.info("Roles assigned to user {}", user.getId());
+
+        // persist client to database
+        loginService.persistClient(verificationClient);
+        logger.info("Client {} persisted to database", verificationClient.getClient().getId());
+
+        // send JSON file of all server members to log channel
+        discordUtil.sendJsonToLogChannel();
+        logger.info("Sent client data for client {} to admin channel", verificationClient.getClient().getId());
+
+        // client is now verified, therefore remove from pending verifications
+        pendingVerifications.remove(verificationClient);
+        discordUtil.sendPrivateMessage(user, "You have been successfully verified. Welcome!");
+        logger.info("User {} has been successfully verified.", user.getId());
     }
 
     @Override
@@ -84,40 +108,37 @@ public class LoginHandler extends ListenerAdapter {
             logger.debug("User input: {}", input);
 
             switch (verificationClient.getState()) {
-                case AWAITING_EMAIL -> {
+                case AWAIT_EMAIL -> {
                     if (loginService.handleEmailInput(verificationClient, input)) {
-                        verificationClient.setState(VerificationStates.AWAITING_CODE);
+                        verificationClient.setState(VerificationStates.AWAIT_CODE);
                     }
                 }
-                case AWAITING_CODE -> {
+                case AWAIT_CODE -> {
                     if (loginService.handleCodeInput(verificationClient, input)) {
-                        verificationClient.setState(VerificationStates.AWAITING_PROFESSION);
+                        verificationClient.setState(VerificationStates.AWAIT_PROFESSION);
                     }
                 }
-                case AWAITING_PROFESSION -> {
+                case AWAIT_PROFESSION -> {
                     if (loginService.handleProfessionInput(verificationClient, input)) {
-                        verificationClient.setState(VerificationStates.AWAITING_CLASS_TEACHER);
+                        if (verificationClient.getClient().getScholar().getName().equals(Scholars.STUDENT)) {
+                            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
+                            verificationClient.setState(VerificationStates.AWAIT_CLASS_TEACHER);
+                        } else {
+                            assignRoles(verificationClient);
+                        }
                     }
                 }
-                case AWAITING_CLASS_TEACHER -> {
+                case AWAIT_CLASS_TEACHER -> {
                     if (loginService.handleTeacherInput(verificationClient, input)) {
-                        logger.info("User {} has been successfully verified.", user.getId());
-                        loginService.assignRoles(verificationClient);
-                        logger.info("Roles assigned to user {}", user.getId());
-                        loginService.persistClient(verificationClient);
-                        // client is now persisted, therefore remove from pending verifications
-                        pendingVerifications.remove(verificationClient);
-                        logger.info("Client {} persisted to database", verificationClient.getClient().getId());
-                        discordUtil.sendJsonToLogChannel();
-                        logger.info("Sent client data for client {} to admin channel", verificationClient.getClient().getId());
+                        assignRoles(verificationClient);
                     }
                 }
                 default -> {
-                    loginService.sendPrivateMessage(user, "Invalid input. Please enter school email, 6-digit code, profession or class name.");
+                    discordUtil.sendPrivateMessage(user, "Invalid input.");
                 }
             }
         }, () -> {
-            loginService.sendPrivateMessage(user, "You are not currently in the verification process.");
+            discordUtil.sendPrivateMessage(user, "You are not currently in the verification process.");
         });
     }
 }

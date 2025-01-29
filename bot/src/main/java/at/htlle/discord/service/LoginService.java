@@ -4,29 +4,21 @@ import at.htlle.discord.jpa.entity.*;
 import at.htlle.discord.jpa.repository.*;
 import at.htlle.discord.model.enums.*;
 import at.htlle.discord.model.VerificationClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.Setter;
+import at.htlle.discord.util.DiscordUtil;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
-import net.dv8tion.jda.api.utils.FileUpload;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.awt.*;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.util.Collections;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import java.util.function.BiConsumer;
 
@@ -34,9 +26,16 @@ import java.util.function.BiConsumer;
 public class LoginService {
     private static final Logger logger = LogManager.getLogger(LoginService.class);
 
-    private static final String EMAIL_REGEX = "^[a-zA-Z0-9._%+-]+@o365\\.htl-leoben\\.at$";
+    private static final String EMAIL_STUDENT_REGEX = "^[a-zA-Z0-9._%+-]+@o365\\.htl-leoben\\.at$";
 
     private static final String EMAIL_TEACHER_REGEX = "^[a-z]+@o365\\.htl-leoben\\.at$";
+
+    // for development - EMAIL_STUDENT_REGEX: gmail email; EMAIL_TEACHER_REGEX: student school email
+    //private static final String EMAIL_STUDENT_REGEX = "^[a-zA-Z0-9._%+-]+@gmail\\.com$";
+    //private static final String EMAIL_TEACHER_REGEX = "^[a-zA-Z0-9._%+-]+@o365\\.htl-leoben\\.at$";
+
+    @Autowired
+    private DiscordUtil discordUtil;
 
     @Autowired
     private VerificationService verificationService;
@@ -59,13 +58,9 @@ public class LoginService {
     @Autowired
     private ScholarRepository scholarRepository;
 
-    public void sendPrivateMessage(User user, String message) {
-        user.openPrivateChannel().queue(channel -> channel.sendMessage(message).queue());
-    }
-
     public boolean handleEmailInput(VerificationClient verificationClient, String email) {
-        if (!email.matches(EMAIL_REGEX)) {
-            sendPrivateMessage(verificationClient.getUser(), "Please enter a valid school email address.");
+        if (!email.matches(EMAIL_STUDENT_REGEX) && !email.matches(EMAIL_TEACHER_REGEX)) {
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter a valid school email address.");
             return false;
         }
 
@@ -73,7 +68,31 @@ public class LoginService {
         mailService.sendVerificationEmail(email, verificationCode);
         verificationClient.getClient().setEmail(email);
 
-        sendPrivateMessage(verificationClient.getUser(), "A verification code has been sent to your email. Please enter the code.");
+        if (email.matches(EMAIL_STUDENT_REGEX)) {
+            // find or create student scholar and assign it
+            scholarRepository.findByName(Scholars.STUDENT).ifPresentOrElse(
+                    s -> {
+                        verificationClient.getClient().setScholar(s);
+                    },
+                    () -> {
+                        Scholar scholar = scholarRepository.save(new Scholar(Scholars.STUDENT));
+                        verificationClient.getClient().setScholar(scholar);
+                    }
+            );
+        } else {
+            // find or create teacher scholar and assign it
+            scholarRepository.findByName(Scholars.TEACHER).ifPresentOrElse(
+                    s -> {
+                        verificationClient.getClient().setScholar(s);
+                    },
+                    () -> {
+                        Scholar scholar = scholarRepository.save(new Scholar(Scholars.TEACHER));
+                        verificationClient.getClient().setScholar(scholar);
+                    }
+            );
+        }
+
+        discordUtil.sendPrivateMessage(verificationClient.getUser(), "A verification code has been sent to your email. Please enter the code.");
         logger.info("Verification email sent to user: {}", verificationClient.getUser().getId());
 
         return true;
@@ -83,18 +102,18 @@ public class LoginService {
         Boolean isCodeValid = verificationService.verifyCode(verificationClient, code);
 
         if (isCodeValid == null) {
-            sendPrivateMessage(verificationClient.getUser(), "Your verification code has expired.");
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Your verification code has expired.");
             handleEmailInput(verificationClient, verificationClient.getClient().getEmail());
             return false;
         }
 
         if (isCodeValid) {
-            sendPrivateMessage(verificationClient.getUser(), "Please enter your profession. One out of " + Arrays.toString(Professions.values()));
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter your profession. One out of " + Arrays.toString(Professions.values()));
             logger.info("Code found for user: {}. Entered email is correct.", verificationClient.getUser().getId());
             return true;
         }
 
-        sendPrivateMessage(verificationClient.getUser(), "Invalid code. Please enter the code again.");
+        discordUtil.sendPrivateMessage(verificationClient.getUser(), "Invalid code. Try again.");
         return false;
     }
 
@@ -114,12 +133,11 @@ public class LoginService {
                     }
             );
 
-            sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
             logger.info("Profession found for user: {}", verificationClient.getUser().getId());
             return true;
         }
 
-        sendPrivateMessage(verificationClient.getUser(), "Invalid profession. Please enter one out of " + Arrays.toString(Professions.values()));
+        discordUtil.sendPrivateMessage(verificationClient.getUser(), "Invalid profession. Please enter one out of " + Arrays.toString(Professions.values()));
         return false;
     }
 
@@ -135,8 +153,8 @@ public class LoginService {
             Optional<Enrolment> enrolmentOptional = enrolmentRepository.findByClassTeacher(teacher);
             // no enrolment found for this class teacher
             if (enrolmentOptional.isEmpty()) {
-                sendPrivateMessage(verificationClient.getUser(), "No class registered for this teacher.");
-                sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
+                discordUtil.sendPrivateMessage(verificationClient.getUser(), "No class registered for this teacher.");
+                discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter your class teacher abbreviation.");
                 logger.info("No class found for teacher: {}", teacher.getAbbreviation());
                 return false;
             }
@@ -148,7 +166,7 @@ public class LoginService {
             return true;
         }
 
-        sendPrivateMessage(verificationClient.getUser(), "Invalid or not supported class teacher abbreviation.");
+        discordUtil.sendPrivateMessage(verificationClient.getUser(), "Invalid or not supported class teacher abbreviation. Try again.");
         return false;
     }
 
@@ -205,40 +223,20 @@ public class LoginService {
         }
 
         // select if teacher or student
-        if (client.getEmail().matches(EMAIL_TEACHER_REGEX)) {
-            // find or create teacher role
-            scholarRepository.findByName(Scholars.TEACHER).ifPresentOrElse(
-                    c -> {
-                        createAndAssignRole.accept(c.getName().getName(), genericRoleColor);
-                        client.setScholar(c);
-                    },
-                    () -> {
-                        Scholar role = scholarRepository.save(new Scholar(Scholars.TEACHER));
-                        createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
-                        client.setScholar(role);
-                    }
-            );
-        } else {
-            // find or create student role
-            scholarRepository.findByName(Scholars.STUDENT).ifPresentOrElse(
-                    c -> {
-                        createAndAssignRole.accept(c.getName().getName(), genericRoleColor);
-                        client.setScholar(c);
-                    },
-                    () -> {
-                        Scholar role = scholarRepository.save(new Scholar(Scholars.STUDENT));
-                        createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
-                        client.setScholar(role);
-                    }
-            );
+        if (client.getScholar().getName().equals(Scholars.STUDENT)) {
+            // find and assign student role
+            Scholar role = scholarRepository.findByName(Scholars.STUDENT).stream().findFirst().get();
+            createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
 
             // assign client year to user role
             createAndAssignRole.accept("Jahrgang " + client.getEnrolment().getYear().getYear().getYear(), genericRoleColor);
             // assign client className to user role
             createAndAssignRole.accept(client.getEnrolment().getName(), classRoleColor);
+        } else {
+            // find and assign teacher role
+            Scholar role = scholarRepository.findByName(Scholars.TEACHER).stream().findFirst().get();
+            createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
         }
-
-        sendPrivateMessage(verificationClient.getUser(), "You have been successfully verified. Welcome!");
     }
 
     public void persistClient(VerificationClient verificationClient) {
@@ -249,9 +247,20 @@ public class LoginService {
                 existingClient -> {
                     existingClient.setEmail(client.getEmail());
                     existingClient.setProfession(client.getProfession());
-                    existingClient.setEnrolment(client.getEnrolment());
                     existingClient.setScholar(client.getScholar());
                     existingClient.setJoinedAt(LocalDateTime.now(ZoneOffset.UTC));
+
+                    if (existingClient.getLeftAt() != null) {
+                        existingClient.setLeftAt(null);
+                    }
+
+                    if (existingClient.getScholar().getName().equals(Scholars.STUDENT)) {
+                        existingClient.setEnrolment(client.getEnrolment());
+                    }
+                    else {
+                        existingClient.setEnrolment(null);
+                    }
+
                     clientRepository.save(existingClient);
                 },
                 () -> {
