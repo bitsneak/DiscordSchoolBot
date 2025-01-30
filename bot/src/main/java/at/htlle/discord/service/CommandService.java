@@ -87,7 +87,6 @@ public class CommandService {
     }
 
     private void handleAddClass(SlashCommandInteractionEvent event) {
-        // use linked hash set to maintain the order of the option values
         List<String> optionValues = new ArrayList<>();
 
         // retrieve all the options for this command
@@ -151,11 +150,76 @@ public class CommandService {
     }
 
     private void handleChangeClassTeacher(SlashCommandInteractionEvent event) {
-        // TODO
+        List<String> optionValues = new ArrayList<>();
+
+        // retrieve all the options for this command
+        BotCommands.CHANGE_CLASS_TEACHER.getOptions().forEach(option -> {
+            // add the option value dynamically based on the option name in the enum
+            optionValues.add(Objects.requireNonNull(event.getOption(option.name())).getAsString());
+        });
+
+        String teacherAbbreviationOld = optionValues.getFirst().toUpperCase();
+        String teacherAbbreviationNew = optionValues.get(1).toUpperCase();
+
+        // check if the new teacher already exists
+        Optional<Teacher> existingNewTeacher = teacherRepository.findByAbbreviation(teacherAbbreviationNew);
+        if (existingNewTeacher.isPresent()) {
+            event.reply("Class teacher already exists: " + teacherAbbreviationNew).queue();
+            return;
+        }
+
+        // check if the old teacher exists
+        Optional<Teacher> existingOldTeacher = teacherRepository.findByAbbreviation(teacherAbbreviationOld);
+        if (existingOldTeacher.isPresent()) {
+            Teacher oldTeacher = existingOldTeacher.get();
+            // rename teacher
+            oldTeacher.setAbbreviation(teacherAbbreviationNew);
+            teacherRepository.save(oldTeacher);
+
+            event.reply("Renamed class teacher: " + teacherAbbreviationOld + " to: " + teacherAbbreviationNew).queue();
+            logger.info("Renamed class teacher: {} to: {}", teacherAbbreviationOld, teacherAbbreviationNew);
+        } else {
+            event.reply("Teacher abbreviation: " + teacherAbbreviationOld + " not found.").queue();
+            logger.error("Teacher abbreviation: {} not found for renaming.", teacherAbbreviationOld);
+        }
     }
 
     private void handleChangeClassClassTeacher(SlashCommandInteractionEvent event) {
-        // TODO
+        List<String> optionValues = new ArrayList<>();
+
+        // retrieve all the options for this command
+        BotCommands.CHANGE_CLASS_CLASS_TEACHER.getOptions().forEach(option -> {
+            // add the option value dynamically based on the option name in the enum
+            optionValues.add(Objects.requireNonNull(event.getOption(option.name())).getAsString());
+        });
+
+        String className = optionValues.getFirst().toUpperCase();
+        String teacherAbbreviation = optionValues.get(1).toUpperCase();
+
+        // check if the class exists
+        Optional<Enrolment> existingEnrolment = enrolmentRepository.findByName(className);
+        if (existingEnrolment.isEmpty()) {
+            event.reply("Class not found: " + className).queue();
+            return;
+        }
+
+        // check if the teacher exists
+        Optional<Teacher> existingNewTeacher = teacherRepository.findByAbbreviation(teacherAbbreviation);
+        if (existingNewTeacher.isEmpty()) {
+            event.reply("Class teacher not found: " + teacherAbbreviation).queue();
+            return;
+        }
+
+        // get the enrolment and teacher
+        Enrolment enrolment = existingEnrolment.get();
+        Teacher newTeacher = existingNewTeacher.get();
+
+        // update the class teacher and enrolment
+        enrolment.setClassTeacher(newTeacher);
+        enrolmentRepository.save(enrolment);
+
+        event.reply("Class teacher changed for: " + className + " to: " + teacherAbbreviation).queue();
+        logger.info("Class teacher changed for: {} to: {}", className, teacherAbbreviation);
     }
 
     private void handlePrintClassTeacher(SlashCommandInteractionEvent event) {
