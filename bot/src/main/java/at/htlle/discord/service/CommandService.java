@@ -55,6 +55,10 @@ public class CommandService {
         switch (botCommand) {
             case ADD_CLASS_TEACHER -> handleAddClassTeacher(event);
             case ADD_CLASS -> handleAddClass(event);
+            case CHANGE_CLASS_TEACHER -> handleChangeClassTeacher(event);
+            case CHANGE_CLASS_CLASS_TEACHER -> handleChangeClassClassTeacher(event);
+            case PRINT_CLASS_TEACHER -> handlePrintClassTeacher(event);
+            case PRINT_CLASS -> handlePrintClass(event);
             case ROTATE -> handleRotate(event);
         }
     }
@@ -144,6 +148,22 @@ public class CommandService {
                             logger.info("Added class: {} with teacher: {}", className, teacher.getAbbreviation());
                         }
                 );
+    }
+
+    private void handleChangeClassTeacher(SlashCommandInteractionEvent event) {
+        // TODO
+    }
+
+    private void handleChangeClassClassTeacher(SlashCommandInteractionEvent event) {
+        // TODO
+    }
+
+    private void handlePrintClassTeacher(SlashCommandInteractionEvent event) {
+        // TODO
+    }
+
+    private void handlePrintClass(SlashCommandInteractionEvent event) {
+        // TODO
     }
 
     private void handleRotate(SlashCommandInteractionEvent event) {
