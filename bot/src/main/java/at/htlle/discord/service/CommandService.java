@@ -10,6 +10,7 @@ import at.htlle.discord.jpa.repository.EnrolmentRepository;
 import at.htlle.discord.jpa.repository.TeacherRepository;
 import at.htlle.discord.jpa.repository.YearRepository;
 import at.htlle.discord.model.enums.BotCommands;
+import at.htlle.discord.model.enums.Colors;
 import at.htlle.discord.model.enums.Years;
 import at.htlle.discord.util.DiscordUtil;
 import lombok.Getter;
@@ -146,90 +147,110 @@ public class CommandService {
     }
 
     private void handleRotate(SlashCommandInteractionEvent event) {
-        // get all enrolments
         List<Enrolment> allEnrolments = enrolmentRepository.findAll();
         Guild guild = event.getGuild();
 
-        // iterate over all enrolments
-        for (Enrolment enrolment : allEnrolments) {
-            // get clients for the enrolment (if any)
+        // separate final year enrolments
+        List<Enrolment> finalYearEnrolments = allEnrolments.stream()
+                .filter(e -> e.getYear().getYear().getNextYear() == null)
+                .toList();
+
+        List<Enrolment> nonFinalYearEnrolments = allEnrolments.stream()
+                .filter(e -> e.getYear().getYear().getNextYear() != null)
+                .toList()
+                .reversed();
+
+        // handle final year enrolments
+        for (Enrolment enrolment : finalYearEnrolments) {
+            List<Client> clients = clientRepository.findByEnrolment(enrolment);
+
+            for (Client client : clients) {
+                String discordId = client.getDiscordId();
+
+                // kick user
+                guild.retrieveMemberById(discordId).queue(
+                        member -> guild.kick(member).queue(
+                                success -> logger.info("Kicked user: {}", discordId),
+                                failure -> logger.error("Failed to kick user: {}", discordId)
+                        ),
+                        failure -> logger.debug("Member not found: {}", discordId)
+                );
+            }
+
+            // remove class role from Discord
+            String roleName = enrolment.getName();
+            guild.getRolesByName(roleName, true).stream()
+                    .findFirst()
+                    .ifPresent(role -> role.delete().queue(
+                            success -> logger.info("Deleted role: {}", roleName),
+                            failure -> logger.error("Failed to delete role {}. Error: {}", roleName, failure.getMessage())
+                    ));
+        }
+
+        // promote non final year enrolments
+        for (Enrolment enrolment : nonFinalYearEnrolments) {
             List<Client> clients = clientRepository.findByEnrolment(enrolment);
 
             Years currentYear = enrolment.getYear().getYear();
             Years nextYear = currentYear.getNextYear();
 
-            // if next year is null, handle the deletion and cleanup
-            if (nextYear == null) {
-                // first, handle clients of this enrolment (if there are any)
-                for (Client client : clients) {
-                    String discordId = client.getDiscordId();
+            Year nextYearEntity = yearRepository.findByYear(nextYear)
+                    .orElseGet(() -> yearRepository.save(new Year(nextYear)));
 
-                    guild.retrieveMemberById(discordId).queue(
-                            member -> {
-                                // kick the user if the member is found
-                                guild.kick(member).queue(
-                                        success -> logger.info("Kicked user: {}", discordId),
-                                        failure -> logger.error("Failed to kick user: {}", discordId)
-                                );
-                            },
-                            failure -> logger.debug("Member not found or unable to retrieve: {}", discordId)
-                    );
+            String oldClassRoleName = enrolment.getName();
+            String newClassRoleName = nextYear.getYear() + oldClassRoleName.substring(1);
 
-                    // remove the client from the database
-                    clientRepository.delete(client);
-                    logger.info("Removed client: {}", client.getId());
-                }
+            // check if the new class already exists
+            Enrolment nextEnrolment = enrolmentRepository.findByName(newClassRoleName)
+                    .orElseGet(() -> {
+                        // if the class does not exist, create it with the same teacher as the previous class
+                        return enrolmentRepository.save(new Enrolment(newClassRoleName, enrolment.getClassTeacher(), nextYearEntity));
+                    });
 
-                // remove the corresponding role from discord
-                String roleName = enrolment.getName();
-                guild.getRolesByName(roleName, true).stream()
-                        .findFirst()
-                        .ifPresent(role -> {
-                            // delete the role from discord
-                            role.delete().queue(
-                                    success -> logger.info("Deleted role: {}", roleName),
-                                    failure -> logger.error("Failed to delete role {}. Error: {}", roleName, failure.getMessage())
-                            );
-                        });
+            // ensure the teacher is always updated
+            nextEnrolment.setClassTeacher(enrolment.getClassTeacher());
+            enrolmentRepository.save(nextEnrolment);
 
-                // remove the enrolment from the database
-                enrolmentRepository.delete(enrolment);
-                logger.info("Deleted enrolment: {}", enrolment.getName());
+            // move students to the new enrolment
+            for (Client client : clients) {
+                client.setEnrolment(nextEnrolment);
+                clientRepository.save(client);
+            }
 
-            } else {
-                // promote the enrolment to the next year
-                // if the next year does not exist, create it
-                Year nextYearEntity = yearRepository.findByYear(nextYear)
-                        .orElseGet(() -> yearRepository.save(new Year(nextYear)));
+            // rename roles
+            guild.getRolesByName(oldClassRoleName, true).stream()
+                    .findFirst()
+                    .ifPresentOrElse(role -> role.getManager().setName(newClassRoleName).queue(
+                            success -> logger.info("Renamed class role {} to {}", oldClassRoleName, newClassRoleName),
+                            error -> logger.error("Failed to rename class role {}. Error: {}", oldClassRoleName, error.getMessage())
+                    ), () -> logger.info("Class role {} not found to rename", oldClassRoleName));
 
-                // old role name has to be set before updating the enrolment name
-                String oldRoleName = enrolment.getName();
+            // assign new year role and remove old one
+            String oldYearRoleName = "Year " + currentYear.getYear();
+            String newYearRoleName = "Year " + nextYear.getYear();
 
-                // update the enrolment with the new year
-                enrolment.setYear(nextYearEntity);
-                enrolment.updateNameWithYear(nextYear);
-                enrolmentRepository.save(enrolment);
+            for (Client client : clients) {
+                String discordId = client.getDiscordId();
+                guild.retrieveMemberById(discordId).queue(
+                        member -> {
+                            // remove old year role
+                            guild.getRolesByName(oldYearRoleName, true).stream()
+                                    .findFirst()
+                                    .ifPresent(role -> guild.removeRoleFromMember(member, role).queue(
+                                            success -> logger.info("Removed old year role {} from user {}", oldYearRoleName, discordId),
+                                            error -> logger.error("Failed to remove old year role {} from user {}. Error: {}", oldYearRoleName, discordId, error.getMessage())
+                                    ));
 
-                // get the new role name
-                String newRoleName = enrolment.getName();
-
-                // find the existing role by the old name and rename it
-                guild.getRolesByName(oldRoleName, true).stream()
-                        .findFirst()
-                        .ifPresentOrElse(role -> {
-                            role.getManager().setName(newRoleName).queue(
-                                    success -> logger.info("Successfully renamed role {} to {}", oldRoleName, newRoleName),
-                                    error -> logger.error("Failed to rename role {}. Error: {}", oldRoleName, error.getMessage())
-                            );
-                        }, () -> {
-                            logger.info("Role {} not found to rename", oldRoleName);
-                        });
+                            // assign new year role
+                            discordUtil.assignRole(guild, member, newYearRoleName, Colors.GENERIC.getColor());
+                        },
+                        failure -> logger.debug("Member not found: {}", discordId)
+                );
             }
         }
 
-        // TODO sends JSON multiple times. Once here, this should be, but everytime a member is kicked, it sends the JSON again -> this should not be
         discordUtil.sendJsonToLogChannel();
-        event.reply("Rotate command executed!").queue();
+        event.reply("Rotate command executed.").queue();
         logger.info(event.getCommandString() + " command executed by {}", event.getUser().getIdLong());
     }
 }

@@ -2,7 +2,6 @@ package at.htlle.discord.bot;
 
 import at.htlle.discord.model.enums.BotCommands;
 import at.htlle.discord.service.CommandService;
-import at.htlle.discord.service.LoginService;
 import lombok.Getter;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;

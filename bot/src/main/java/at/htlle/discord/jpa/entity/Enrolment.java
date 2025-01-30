@@ -6,7 +6,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "class", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"name", "teacher_id", "email", "year_id"})
+        @UniqueConstraint(columnNames = {"name", "teacher_id", "year_id"})
 })
 @Getter
 @Setter
@@ -27,7 +27,7 @@ public class Enrolment {
     private String name;
 
     @ManyToOne
-    @JoinColumn(name = "teacher_id", nullable = false, unique = true)
+    @JoinColumn(name = "teacher_id", nullable = false)
     @NonNull
     private Teacher classTeacher;
 
@@ -36,6 +36,7 @@ public class Enrolment {
     @NonNull
     private Year year;
 
+    /*
     public void updateNameWithYear(Years newYear) {
         String currentName = getName();
         // extract the current class suffix
@@ -43,4 +44,5 @@ public class Enrolment {
         // update the name with the new year
         setName(newYear.getYear() + suffix);
     }
+     */
 }

@@ -60,14 +60,14 @@ public class LoginHandler extends ListenerAdapter {
                 .ifPresentOrElse(
                         pendingVerifications::remove,
                         () -> {
-                            // delete the client from the database if they exist
+                            // set the left at attribute from the client
                             clientRepository.findByDiscordId(user.getId()).ifPresent(client -> {
                                 client.setLeftAt(LocalDateTime.now(ZoneOffset.UTC));
                                 clientRepository.save(client);
-                                logger.info("Removed client: {}", user.getId());
+                                logger.info("client: {} left the server", user.getId());
                             });
 
-                            // only send the JSON update if it is not part of the rotation process
+                            // send JSON file of the db to the log channel
                             discordUtil.sendJsonToLogChannel();
                         }
                 );

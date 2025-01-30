@@ -5,7 +5,7 @@ import lombok.*;
 
 @Entity
 @Table(name = "teacher", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"name"}),
+        @UniqueConstraint(columnNames = {"abbreviation"}),
 })
 @Getter
 @Setter

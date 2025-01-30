@@ -176,66 +176,29 @@ public class LoginService {
         Guild guild = verificationClient.getGuild();
         Member member = guild.retrieveMember(user).complete();
 
-        // discord colors
-        Color itProffesionColor = Color.decode("#f0c50f");
-        Color lProffesionColor = Color.decode("#9a59b7");
-        Color mProffesionColor = Color.decode("#3599db");
-        Color rProffesionColor = Color.decode("#2ecc71");
-        Color genericRoleColor = Color.decode("#94a5a7");
-        Color classRoleColor = Color.decode("#e64c3d");
-
-        // Helper method to assign a role by name
-        BiConsumer<String, Color> createAndAssignRole = (roleName, color) -> {
-            Optional<Role> existingRole = guild.getRolesByName(roleName, true).stream().findFirst();
-
-            if (existingRole.isPresent()) {
-                // If the role exists, assign it
-                guild.addRoleToMember(member, existingRole.get()).queue(
-                        success -> logger.info("Successfully assigned existing role {} to user {}", roleName, user.getId()),
-                        error -> logger.error("Failed to assign existing role {} to user {}. Error: {}", roleName, user.getId(), error.getMessage())
-                );
-            } else {
-                // If the role doesn't exist, create it and then assign it
-                guild.createRole()
-                        .setName(roleName)
-                        .setColor(color)
-                        .setMentionable(true)
-                        .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
-                        .queue(
-                                role -> {
-                                    guild.addRoleToMember(member, role).queue(
-                                            success -> logger.info("Created and assigned new role {} to user {}", roleName, user.getId()),
-                                            error -> logger.error("Failed to assign new role {} to user {}. Error: {}", roleName, user.getId(), error.getMessage())
-                                    );
-                                },
-                                error -> logger.error("Failed to create role {}. Error: {}", roleName, error.getMessage())
-                        );
-            }
-        };
-
         // assign client profession to user role
         Professions profession = client.getProfession().getName();
         switch (profession) {
-            case IT -> createAndAssignRole.accept(profession.getName(), itProffesionColor);
-            case L -> createAndAssignRole.accept(profession.getName(), lProffesionColor);
-            case M -> createAndAssignRole.accept(profession.getName(), mProffesionColor);
-            case R -> createAndAssignRole.accept(profession.getName(), rProffesionColor);
+            case IT -> discordUtil.assignRole(guild, member, profession.getName(), Colors.IT.getColor());
+            case L -> discordUtil.assignRole(guild, member, profession.getName(), Colors.L.getColor());
+            case M -> discordUtil.assignRole(guild, member, profession.getName(), Colors.M.getColor());
+            case R -> discordUtil.assignRole(guild, member, profession.getName(), Colors.R.getColor());
         }
 
         // select if teacher or student
         if (client.getScholar().getName().equals(Scholars.STUDENT)) {
             // find and assign student role
             Scholar role = scholarRepository.findByName(Scholars.STUDENT).stream().findFirst().get();
-            createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
+            discordUtil.assignRole(guild, member, role.getName().getName(), Colors.GENERIC.getColor());
 
             // assign client year to user role
-            createAndAssignRole.accept("Jahrgang " + client.getEnrolment().getYear().getYear().getYear(), genericRoleColor);
+            discordUtil.assignRole(guild, member, "Year " + client.getEnrolment().getYear().getYear().getYear(), Colors.GENERIC.getColor());
             // assign client className to user role
-            createAndAssignRole.accept(client.getEnrolment().getName(), classRoleColor);
+            discordUtil.assignRole(guild, member, client.getEnrolment().getName(), Colors.CLASS.getColor());
         } else {
             // find and assign teacher role
             Scholar role = scholarRepository.findByName(Scholars.TEACHER).stream().findFirst().get();
-            createAndAssignRole.accept(role.getName().getName(), genericRoleColor);
+            discordUtil.assignRole(guild, member, role.getName().getName(), Colors.GENERIC.getColor());
         }
     }
 
