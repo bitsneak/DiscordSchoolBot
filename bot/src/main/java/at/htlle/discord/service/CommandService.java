@@ -94,6 +94,12 @@ public class CommandService {
         String className = optionValues.getFirst().toUpperCase();
         String teacherAbbreviation = optionValues.get(1).toUpperCase();
 
+        // check if the class name matches the pattern (starts with a number followed by other characters)
+        if (!className.matches("^\\d\\D.*")) {
+            event.reply("Invalid class name format: " + className + ". Must start with a number followed by other characters.").queue();
+            return;
+        }
+
         enrolmentRepository.findByName(className)
                 .ifPresentOrElse(
                         e -> event.reply("Class already exists: " + className).queue(),
@@ -112,12 +118,11 @@ public class CommandService {
                                 return;
                             }
 
-                            // TODO only let class names be allowed where only the first character is a number (year)
-                            // TODO after the year number there should be something else -> so not just the year number
                             // first character of the class name is always the year
                             String classYear = String.valueOf(className.charAt(0));
                             Optional<Years> yearEnumOptional = Arrays.stream(Years.values()).
                                     filter(y -> y.getYear().equalsIgnoreCase(classYear)).findFirst();
+
                             // check if the year is valid
                             if (yearEnumOptional.isEmpty()) {
                                 event.reply("Invalid class year / name: " + className).queue();
