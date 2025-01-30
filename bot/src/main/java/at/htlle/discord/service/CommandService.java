@@ -76,7 +76,7 @@ public class CommandService {
         // find or create teacher by abbreviation
         teacherRepository.findByAbbreviation(abbreviation)
                 .ifPresentOrElse(
-                        t -> event.reply("Class teacher already exists: " + abbreviation).queue(),
+                        t -> event.reply("Class teacher already exists: **" + abbreviation + "**").queue(),
                         () ->
                         {
                             teacherRepository.save(new Teacher(abbreviation));
@@ -100,25 +100,25 @@ public class CommandService {
 
         // check if the class name matches the pattern (starts with a number followed by other characters)
         if (!className.matches("^\\d\\D.*")) {
-            event.reply("Invalid class name format: " + className + ". Must start with a number followed by other characters.").queue();
+            event.reply("Invalid class name format: **" + className + "**. Must start with a number followed by other characters").queue();
             return;
         }
 
         enrolmentRepository.findByName(className)
                 .ifPresentOrElse(
-                        e -> event.reply("Class already exists: " + className).queue(),
+                        e -> event.reply("Class already exists: **" + className + "**").queue(),
                         () -> {
                             // find teacher by abbreviation
                             Optional<Teacher> teacherOptional = teacherRepository.findByAbbreviation(teacherAbbreviation);
                             if (teacherOptional.isEmpty()) {
-                                event.reply("Class teacher not found: " + teacherAbbreviation).queue();
+                                event.reply("Class teacher not found: **" + teacherAbbreviation + "**").queue();
                                 return;
                             }
                             Teacher teacher = teacherOptional.get();
 
                             // check if teacher already has a class
                             if (enrolmentRepository.findByClassTeacher(teacher).isPresent()) {
-                                event.reply("Teacher " + teacher.getAbbreviation() + " has already a class").queue();
+                                event.reply("Class teacher **" + teacher.getAbbreviation() + "** has already a class").queue();
                                 return;
                             }
 
@@ -129,7 +129,7 @@ public class CommandService {
 
                             // check if the year is valid
                             if (yearEnumOptional.isEmpty()) {
-                                event.reply("Invalid class year / name: " + className).queue();
+                                event.reply("Invalid class year / name: **" + className + "**").queue();
                                 return;
                             }
                             Years yearEnum = yearEnumOptional.get();
@@ -143,7 +143,7 @@ public class CommandService {
 
                             // save enrolment
                             enrolmentRepository.save(new Enrolment(className, teacher, year));
-                            event.reply("Added class: " + className + " with teacher: " + teacher.getAbbreviation()).queue();
+                            event.reply("Added class: **" + className + "** with teacher: **" + teacher.getAbbreviation() + "**").queue();
                             logger.info("Added class: {} with teacher: {}", className, teacher.getAbbreviation());
                         }
                 );
@@ -164,7 +164,7 @@ public class CommandService {
         // check if the new teacher already exists
         Optional<Teacher> existingNewTeacher = teacherRepository.findByAbbreviation(teacherAbbreviationNew);
         if (existingNewTeacher.isPresent()) {
-            event.reply("Class teacher already exists: " + teacherAbbreviationNew).queue();
+            event.reply("Class teacher already exists: **" + teacherAbbreviationNew + "**").queue();
             return;
         }
 
@@ -176,10 +176,10 @@ public class CommandService {
             oldTeacher.setAbbreviation(teacherAbbreviationNew);
             teacherRepository.save(oldTeacher);
 
-            event.reply("Renamed class teacher: " + teacherAbbreviationOld + " to: " + teacherAbbreviationNew).queue();
+            event.reply("Renamed class teacher: **" + teacherAbbreviationOld + "** to: **" + teacherAbbreviationNew + "**").queue();
             logger.info("Renamed class teacher: {} to: {}", teacherAbbreviationOld, teacherAbbreviationNew);
         } else {
-            event.reply("Teacher abbreviation: " + teacherAbbreviationOld + " not found.").queue();
+            event.reply("Teacher abbreviation: **" + teacherAbbreviationOld + "** not found.").queue();
             logger.error("Teacher abbreviation: {} not found for renaming.", teacherAbbreviationOld);
         }
     }
@@ -199,14 +199,14 @@ public class CommandService {
         // check if the class exists
         Optional<Enrolment> existingEnrolment = enrolmentRepository.findByName(className);
         if (existingEnrolment.isEmpty()) {
-            event.reply("Class not found: " + className).queue();
+            event.reply("Class not found: **" + className + "**").queue();
             return;
         }
 
         // check if the teacher exists
         Optional<Teacher> existingNewTeacher = teacherRepository.findByAbbreviation(teacherAbbreviation);
         if (existingNewTeacher.isEmpty()) {
-            event.reply("Class teacher not found: " + teacherAbbreviation).queue();
+            event.reply("Class teacher not found: **" + teacherAbbreviation + "**").queue();
             return;
         }
 
@@ -218,16 +218,43 @@ public class CommandService {
         enrolment.setClassTeacher(newTeacher);
         enrolmentRepository.save(enrolment);
 
-        event.reply("Class teacher changed for: " + className + " to: " + teacherAbbreviation).queue();
+        event.reply("Class teacher changed for: **" + className + "** to: **" + teacherAbbreviation + "**").queue();
         logger.info("Class teacher changed for: {} to: {}", className, teacherAbbreviation);
     }
 
     private void handlePrintClassTeacher(SlashCommandInteractionEvent event) {
-        // TODO
+        List<Teacher> teachers = teacherRepository.findAll();
+
+        // check if there are any teachers
+        if (teachers.isEmpty()) {
+            event.reply("No class teachers found.").queue();
+            return;
+        }
+
+        // format teachers
+        String teacherNames = teachers.stream()
+                .map(Teacher::getAbbreviation)
+                .collect(Collectors.joining("\n"));
+
+        event.reply("**Class teachers**\n" + teacherNames).queue();
     }
 
     private void handlePrintClass(SlashCommandInteractionEvent event) {
-        // TODO
+        List<Enrolment> enrolments = enrolmentRepository.findAll();
+
+        // check if there are any classes
+        if (enrolments.isEmpty()) {
+            event.reply("No classes found.").queue();
+            return;
+        }
+
+        // format enrolments with their class teachers
+        String classList = enrolments.stream()
+                .map(enrolment -> enrolment.getName() + " - " +
+                        enrolment.getClassTeacher().getAbbreviation())
+                .collect(Collectors.joining("\n"));
+
+        event.reply("**Classes and class teachers**\n" + classList).queue();
     }
 
     private void handleRotate(SlashCommandInteractionEvent event) {
@@ -239,6 +266,7 @@ public class CommandService {
                 .filter(e -> e.getYear().getYear().getNextYear() == null)
                 .toList();
 
+        // separate non final year enrolments
         List<Enrolment> nonFinalYearEnrolments = allEnrolments.stream()
                 .filter(e -> e.getYear().getYear().getNextYear() != null)
                 .toList()
