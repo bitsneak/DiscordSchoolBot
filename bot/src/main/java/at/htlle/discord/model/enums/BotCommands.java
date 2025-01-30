@@ -20,6 +20,30 @@ public enum BotCommands {
                     new CommandOption("class", "The name of the class", true),
                     new CommandOption("teacher-abbreviation", "The abbreviation of the class teacher", true)
             )),
+    CHANGE_CLASS_TEACHER(
+            "change",
+            "class-teacher",
+            "Change the name of an existing class teacher",
+            List.of(
+                    new CommandOption("teacher-abbreviation-old", "The old abbreviation of the class teacher", true),
+                    new CommandOption("teacher-abbreviation-new", "The new abbreviation of the class teacher", true)
+            )),
+    CHANGE_CLASS_CLASS_TEACHER(
+            "change",
+            "class",
+            "Change the class teacher of an existing class",
+            List.of(
+                    new CommandOption("class", "The name of the class", true),
+                    new CommandOption("teacher-abbreviation", "The abbreviation of the class teacher", true)
+            )),
+    PRINT_CLASS_TEACHER(
+            "print",
+            "class-teacher",
+            "Print out all class teachers"),
+    PRINT_CLASS(
+            "print",
+            "class",
+            "Print out all classes with corresponding class teachers"),
     ROTATE("rotate", "Rotate the classes one year forward");
 
     private final String command;
@@ -35,7 +59,7 @@ public enum BotCommands {
         this(command, subcommand, description, Collections.emptyList());
     }
 
-    BotCommands (String command, String subcommand, String description, List<CommandOption> options) {
+    BotCommands(String command, String subcommand, String description, List<CommandOption> options) {
         this.command = command;
         this.subcommand = subcommand;
         this.description = description;

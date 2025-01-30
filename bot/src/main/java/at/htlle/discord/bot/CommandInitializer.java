@@ -14,12 +14,28 @@ public class CommandInitializer {
     public List<CommandData> initializeCommands() {
         List<CommandData> commands = new ArrayList<>();
 
-        // add command with subcommands
+        // add add-command with subcommands
         commands.add(Commands
                 .slash(BotCommands.ADD_CLASS.getCommand(), "Adds a class or class teacher")
                 .addSubcommands(
                         createSubcommand(BotCommands.ADD_CLASS_TEACHER),
                         createSubcommand(BotCommands.ADD_CLASS)
+                ));
+
+        // add change-command with subcommands
+        commands.add(Commands
+                .slash(BotCommands.CHANGE_CLASS_CLASS_TEACHER.getCommand(), "Change a class or class teacher")
+                .addSubcommands(
+                        createSubcommand(BotCommands.CHANGE_CLASS_TEACHER),
+                        createSubcommand(BotCommands.CHANGE_CLASS_CLASS_TEACHER)
+                ));
+
+        // add print-command with subcommands
+        commands.add(Commands
+                .slash(BotCommands.PRINT_CLASS.getCommand(), "Prints out all classes or class teachers")
+                .addSubcommands(
+                        createSubcommand(BotCommands.PRINT_CLASS_TEACHER),
+                        createSubcommand(BotCommands.PRINT_CLASS)
                 ));
 
         // add rotation command
