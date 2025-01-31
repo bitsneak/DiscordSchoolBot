@@ -7,6 +7,11 @@ import java.util.List;
 
 @Getter
 public enum BotCommands {
+    ADD_YEAR(
+            "add",
+            "year",
+            "Add a year",
+            List.of(new CommandOption("year", "The integer of the school year", true))),
     ADD_CLASS_TEACHER(
             "add",
             "class-teacher",
@@ -44,6 +49,10 @@ public enum BotCommands {
                     new CommandOption("class", "The name of the class", true),
                     new CommandOption("teacher-abbreviation", "The abbreviation of the class teacher", true)
             )),
+    PRINT_YEAR(
+            "print",
+            "year",
+            "Print out all years"),
     PRINT_CLASS_TEACHER(
             "print",
             "class-teacher",

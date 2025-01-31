@@ -8,7 +8,6 @@ import at.htlle.discord.util.DiscordUtil;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
-import net.dv8tion.jda.api.events.user.update.UserUpdateNameEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,9 +68,7 @@ public class LoginService {
         if (email.matches(EMAIL_STUDENT_REGEX)) {
             // find or create student scholar and assign it
             scholarRepository.findByName(Scholars.STUDENT).ifPresentOrElse(
-                    s -> {
-                        verificationClient.getClient().setScholar(s);
-                    },
+                    verificationClient.getClient()::setScholar,
                     () -> {
                         Scholar scholar = scholarRepository.save(new Scholar(Scholars.STUDENT));
                         verificationClient.getClient().setScholar(scholar);
@@ -80,9 +77,7 @@ public class LoginService {
         } else {
             // find or create teacher scholar and assign it
             scholarRepository.findByName(Scholars.TEACHER).ifPresentOrElse(
-                    s -> {
-                        verificationClient.getClient().setScholar(s);
-                    },
+                    s -> verificationClient.getClient().setScholar(s),
                     () -> {
                         Scholar scholar = scholarRepository.save(new Scholar(Scholars.TEACHER));
                         verificationClient.getClient().setScholar(scholar);
@@ -190,7 +185,7 @@ public class LoginService {
             discordUtil.assignOrChangeRole(guild, member, role.getName().getName(), role.getName().getName(), Colors.GENERIC.getColor());
 
             // assign client year to user role
-            discordUtil.assignOrChangeRole(guild, member, "Year " + client.getEnrolment().getYear().getYear().getYear(), "Year " + client.getEnrolment().getYear().getYear().getYear(), Colors.GENERIC.getColor());
+            discordUtil.assignOrChangeRole(guild, member, "Year " + client.getEnrolment().getYear().getYear(), "Year " + client.getEnrolment().getYear().getYear(), Colors.GENERIC.getColor());
             // assign client className to user role
             discordUtil.assignOrChangeRole(guild, member, client.getEnrolment().getName(), client.getEnrolment().getName(), Colors.CLASS.getColor());
         } else {

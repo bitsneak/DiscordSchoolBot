@@ -1,6 +1,5 @@
 package at.htlle.discord.jpa.entity;
 
-import at.htlle.discord.model.enums.Years;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,7 +20,6 @@ public class Year {
     private Long id;
 
     @Column(name = "year", nullable = false, unique = true)
-    @Enumerated(EnumType.STRING)
     @NonNull
-    private Years year;
+    private Integer year;
 }

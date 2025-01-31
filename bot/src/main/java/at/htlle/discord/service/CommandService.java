@@ -10,7 +10,6 @@ import at.htlle.discord.jpa.repository.TeacherRepository;
 import at.htlle.discord.jpa.repository.YearRepository;
 import at.htlle.discord.model.enums.BotCommands;
 import at.htlle.discord.model.enums.Colors;
-import at.htlle.discord.model.enums.Years;
 import at.htlle.discord.util.DiscordUtil;
 import lombok.Getter;
 import lombok.Setter;
@@ -50,20 +49,54 @@ public class CommandService {
 
     public void handleCommand(SlashCommandInteractionEvent event, BotCommands botCommand) {
         switch (botCommand) {
+            case ADD_YEAR -> addYear(event);
             case ADD_CLASS_TEACHER -> addClassTeacher(event);
             case ADD_CLASS -> addClass(event);
             case CHANGE_CLASS_TEACHER -> changeClassTeacher(event);
             case CHANGE_CLASS_CLASS_TEACHER -> changeClassTeacherFromClass(event);
             case CHANGE_CLASS_NAME -> changeClassName(event);
-            case PRINT_CLASS_TEACHER -> printClassTeacher(event);
-            case PRINT_CLASS -> printClass(event);
+            case PRINT_YEAR -> printYears(event);
+            case PRINT_CLASS_TEACHER -> printClassTeachers(event);
+            case PRINT_CLASS -> printClasses(event);
             case ROTATE -> rotate(event);
         }
     }
 
+    private void addYear(SlashCommandInteractionEvent event) {
+        // get the year from the command option
+        String input = Objects.requireNonNull(event.getOption(
+                BotCommands.ADD_YEAR.getOptions()
+                        .stream()
+                        .findFirst()
+                        .map(BotCommands.CommandOption::name)
+                        .orElseThrow()
+        )).getAsString().toUpperCase();
+
+        // check if input is truly an integer
+        int year;
+        try {
+            year = Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            event.reply("Input was not an integer").queue();
+            return;
+        }
+
+        // find or create year
+        yearRepository.findByYear(year)
+                .ifPresentOrElse(
+                        y -> event.reply("Year already exists: **" + year + "**").queue(),
+                        () ->
+                        {
+                            yearRepository.save(new Year(year));
+                            event.reply("Added year: **" + input + "**").queue();
+                            logger.info("Added class teacher: {}", input);
+                        }
+                );
+    }
+
     private void addClassTeacher(SlashCommandInteractionEvent event) {
         // get the abbreviation of the class teacher from the command option
-        String abbreviation = Objects.requireNonNull(event.getOption(
+        String input = Objects.requireNonNull(event.getOption(
                 BotCommands.ADD_CLASS_TEACHER.getOptions()
                         .stream()
                         .findFirst()
@@ -72,14 +105,14 @@ public class CommandService {
         )).getAsString().toUpperCase();
 
         // find or create teacher by abbreviation
-        teacherRepository.findByAbbreviation(abbreviation)
+        teacherRepository.findByAbbreviation(input)
                 .ifPresentOrElse(
-                        t -> event.reply("Class teacher already exists: **" + abbreviation + "**").queue(),
+                        t -> event.reply("Class teacher already exists: **" + input + "**").queue(),
                         () ->
                         {
-                            teacherRepository.save(new Teacher(abbreviation));
-                            event.reply("Added class teacher: **" + abbreviation + "**").queue();
-                            logger.info("Added class teacher: {}", abbreviation);
+                            teacherRepository.save(new Teacher(input));
+                            event.reply("Added class teacher: **" + input + "**").queue();
+                            logger.info("Added class teacher: {}", input);
                         }
                 );
     }
@@ -93,18 +126,18 @@ public class CommandService {
             optionValues.add(Objects.requireNonNull(event.getOption(option.name())).getAsString());
         });
 
-        String className = optionValues.getFirst().toUpperCase();
+        String enrolmentName = optionValues.getFirst().toUpperCase();
         String teacherAbbreviation = optionValues.get(1).toUpperCase();
 
         // check if the class name matches the pattern (starts with a number followed by other characters)
-        if (!className.matches("^\\d\\D.*")) {
-            event.reply("Invalid class name format **" + className + "**. Must start with a number followed by other characters").queue();
+        if (!enrolmentName.matches("^\\d\\D.*")) {
+            event.reply("Invalid class name format **" + enrolmentName + "**. Must start with an integer followed by other characters").queue();
             return;
         }
 
-        enrolmentRepository.findByName(className)
+        enrolmentRepository.findByName(enrolmentName)
                 .ifPresentOrElse(
-                        e -> event.reply("Class already exists: **" + className + "**").queue(),
+                        e -> event.reply("Class already exists: **" + enrolmentName + "**").queue(),
                         () -> {
                             // find teacher by abbreviation
                             Optional<Teacher> teacherOptional = teacherRepository.findByAbbreviation(teacherAbbreviation);
@@ -121,28 +154,19 @@ public class CommandService {
                             }
 
                             // first character of the class name is always the year
-                            String classYear = String.valueOf(className.charAt(0));
-                            Optional<Years> yearEnumOptional = Arrays.stream(Years.values()).
-                                    filter(y -> y.getYear().equalsIgnoreCase(classYear)).findFirst();
+                            String classYear = String.valueOf(enrolmentName.charAt(0));
 
-                            // check if the year is valid
-                            if (yearEnumOptional.isEmpty()) {
-                                event.reply("Invalid class year / name: **" + className + "**").queue();
+                            // find year
+                            Optional<Year> year = yearRepository.findByYear(Integer.parseInt(classYear));
+                            if (year.isEmpty()) {
+                                event.reply("Invalid class year: **" + classYear + "**").queue();
                                 return;
                             }
-                            Years yearEnum = yearEnumOptional.get();
-
-                            // find or create year
-                            Optional<Year> yearOptional = yearRepository.findByYear(yearEnum);
-                            if (yearOptional.isEmpty()) {
-                                yearRepository.save(new Year(yearEnum));
-                            }
-                            Year year = yearRepository.findByYear(yearEnum).get();
 
                             // save enrolment
-                            enrolmentRepository.save(new Enrolment(className, teacher, year));
-                            event.reply("Added class **" + className + "** with teacher **" + teacher.getAbbreviation() + "**").queue();
-                            logger.info("Added class: {} with teacher: {}", className, teacher.getAbbreviation());
+                            enrolmentRepository.save(new Enrolment(enrolmentName, teacher, year.get()));
+                            event.reply("Added class **" + enrolmentName + "** with teacher **" + teacher.getAbbreviation() + "**").queue();
+                            logger.info("Added class: {} with teacher: {}", enrolmentName, teacher.getAbbreviation());
                         }
                 );
     }
@@ -209,17 +233,23 @@ public class CommandService {
         if (existingOldEnrolment.isPresent()) {
             Enrolment newEnrolment = existingOldEnrolment.get();
 
+            // first character of the class name is always the year
+            String classYear = String.valueOf(enrolmentNameNew.charAt(0));
+
+            // find year
+            Optional<Year> year = yearRepository.findByYear(Integer.parseInt(classYear));
+            if (year.isEmpty()) {
+                event.reply("Invalid class year: **" + classYear + "**").queue();
+                return;
+            }
+
             // rename enrolment
             newEnrolment.setName(enrolmentNameNew);
+            newEnrolment.setYear(year.get());
             enrolmentRepository.save(newEnrolment);
 
-            // reset class teacher of now old class
-            //Enrolment oldEnrolment = enrolmentRepository.findByName(enrolmentNameOld).get();
-            //oldEnrolment.setTeacher(null);
-            //enrolmentRepository.save(newEnrolment);
-
             // change the corresponding Discord role
-            discordUtil.assignOrChangeRole(event.getGuild(), event.getMember(), enrolmentNameOld, enrolmentNameNew, Colors.CLASS.getColor());
+            discordUtil.assignOrChangeRole(Objects.requireNonNull(event.getGuild()), event.getMember(), enrolmentNameOld, enrolmentNameNew, Colors.CLASS.getColor());
 
             // send JSON file to the log channel
             discordUtil.sendJsonToLogChannel();
@@ -281,7 +311,25 @@ public class CommandService {
         logger.info("Class teacher changed for class: {} from: {} to: {}", className, teacherAbbreviationOld, teacherAbbreviationNew);
     }
 
-    private void printClassTeacher(SlashCommandInteractionEvent event) {
+    private void printYears(SlashCommandInteractionEvent event) {
+        List<Year> years = yearRepository.findAll();
+
+        // check if there are any years
+        if (years.isEmpty()) {
+            event.reply("No years found").queue();
+            return;
+        }
+
+        // format years
+        String formattedYears = years.stream()
+                .sorted(Comparator.comparing(Year::getYear))
+                .map(year -> "- " + year.getYear())
+                .collect(Collectors.joining("\n"));
+
+        event.reply("**Years**\n" + formattedYears).queue();
+    }
+
+    private void printClassTeachers(SlashCommandInteractionEvent event) {
         List<Teacher> teachers = teacherRepository.findAll();
 
         // check if there are any teachers
@@ -291,15 +339,15 @@ public class CommandService {
         }
 
         // format teachers
-        String teacherNames = teachers.stream()
+        String formattedTeachers = teachers.stream()
                 .sorted(Comparator.comparing(Teacher::getAbbreviation))
                 .map(teacher -> "- " + teacher.getAbbreviation())
                 .collect(Collectors.joining("\n"));
 
-        event.reply("**Class teachers**\n" + teacherNames).queue();
+        event.reply("**Class teachers**\n" + formattedTeachers).queue();
     }
 
-    private void printClass(SlashCommandInteractionEvent event) {
+    private void printClasses(SlashCommandInteractionEvent event) {
         List<Enrolment> enrolments = enrolmentRepository.findAll();
 
         // check if there are any classes
@@ -309,13 +357,13 @@ public class CommandService {
         }
 
         // format enrolments with their class teachers
-        String classList = enrolments.stream()
+        String formattedClasses = enrolments.stream()
                 .sorted(Comparator.comparing(Enrolment::getName))
                 .map(enrolment -> "- " + enrolment.getName() + ": " +
                         (enrolment.getTeacher() != null ? enrolment.getTeacher().getAbbreviation() : "No teacher"))
                 .collect(Collectors.joining("\n"));
 
-        event.reply("**Classes and class teachers**\n" + classList).queue();
+        event.reply("**Classes and class teachers**\n" + formattedClasses).queue();
     }
 
     private void rotate(SlashCommandInteractionEvent event) {
@@ -324,13 +372,13 @@ public class CommandService {
 
         // separate final year enrolments
         List<Enrolment> finalYearEnrolments = allEnrolments.stream()
-                .filter(e -> e.getYear().getYear().getNextYear() == null)
+                .filter(e -> yearRepository.findByYear(e.getYear().getYear() + 1).isEmpty()) // no next year exists
                 .toList();
 
-        // separate non final year enrolments
+        // separate non-final year enrolments
         List<Enrolment> nonFinalYearEnrolments = allEnrolments.stream()
-                .filter(e -> e.getYear().getYear().getNextYear() != null)
-                .sorted((e1, e2) -> e2.getYear().getYear().compareTo(e1.getYear().getYear())) // sorting by year in descending order
+                .filter(e -> yearRepository.findByYear(e.getYear().getYear() + 1).isPresent())
+                .sorted(Comparator.comparingInt(e -> -e.getYear().getYear())) // sorting by year in descending order
                 .toList();
 
         // handle final year enrolments
@@ -368,14 +416,15 @@ public class CommandService {
         for (Enrolment enrolment : nonFinalYearEnrolments) {
             List<Client> clients = clientRepository.findByEnrolment(enrolment);
 
-            Years currentYear = enrolment.getYear().getYear();
-            Years nextYear = currentYear.getNextYear();
+            int currentYearValue = enrolment.getYear().getYear();
+            int nextYearValue = currentYearValue + 1;
 
-            Year nextYearEntity = yearRepository.findByYear(nextYear)
-                    .orElseGet(() -> yearRepository.save(new Year(nextYear)));
+            // get the next year entity
+            Year nextYearEntity = yearRepository.findByYear(nextYearValue).get();
 
+            // generate new class role name
             String oldClassRoleName = enrolment.getName();
-            String newClassRoleName = nextYear.getYear() + oldClassRoleName.substring(1);
+            String newClassRoleName = nextYearValue + oldClassRoleName.substring(1);
 
             // the current class teacher
             Teacher teacher = enrolment.getTeacher();
@@ -410,8 +459,8 @@ public class CommandService {
                     ), () -> logger.info("Class role: {} not found to rename", oldClassRoleName));
 
             // assign new year role and remove old one
-            String oldYearRoleName = "Year " + currentYear.getYear();
-            String newYearRoleName = "Year " + nextYear.getYear();
+            String oldYearRoleName = "Year " + currentYearValue;
+            String newYearRoleName = "Year " + nextYearValue;
 
             for (Client client : clients) {
                 String discordId = client.getDiscordId();
