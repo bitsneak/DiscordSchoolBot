@@ -8,6 +8,7 @@ import at.htlle.discord.util.DiscordUtil;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.events.user.update.UserUpdateNameEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,6 +64,7 @@ public class LoginService {
         String verificationCode = verificationService.generateVerificationCode(verificationClient);
         mailService.sendVerificationEmail(email, verificationCode);
         verificationClient.getClient().setEmail(email);
+        verificationClient.getClient().setDiscordName(verificationClient.getUser().getName());
 
         if (email.matches(EMAIL_STUDENT_REGEX)) {
             // find or create student scholar and assign it
@@ -204,6 +206,7 @@ public class LoginService {
 
         clientRepository.findByDiscordId(user.getId()).ifPresentOrElse(
                 existingClient -> {
+                    existingClient.setDiscordName(client.getDiscordName());
                     existingClient.setEmail(client.getEmail());
                     existingClient.setProfession(client.getProfession());
                     existingClient.setScholar(client.getScholar());
@@ -229,5 +232,11 @@ public class LoginService {
                     clientRepository.save(client);
                 }
         );
+    }
+
+    public void changeUsername(String oldName, String newName) {
+        clientRepository.findByDiscordName(oldName)
+                .ifPresent(client -> client.setDiscordName(newName));
+        logger.info("User renamed from: {} to: {}", oldName, newName);
     }
 }

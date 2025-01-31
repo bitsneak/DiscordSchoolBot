@@ -55,7 +55,7 @@ public class DiscordUtil {
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(byteArrayOutputStream, clients);
             byte[] content = byteArrayOutputStream.toByteArray();
-            logChannel.sendFiles(Collections.singletonList(FileUpload.fromData(content, "user_data-" + timestamp.replace(":", "_") + ".json"))).queue();
+            logChannel.sendFiles(Collections.singletonList(FileUpload.fromData(content, "user-data-" + timestamp.replace(":", "-") + ".json"))).queue();
             logger.info("JSON file sent to log channel successfully.");
         } catch (IOException e) {
             logger.error("Error while sending JSON to log channel: {}", e.getMessage(), e);
@@ -68,13 +68,6 @@ public class DiscordUtil {
         if (existingRole.isPresent()) {
             // role exists, rename and change color
             Role role = existingRole.get();
-
-            /*role.getManager().setName(newRoleName).setColor(color).queue(
-                    success -> logger.info("Changed role {} to {}", oldRoleName, newRoleName),
-                    error -> logger.error("Failed to change role {} to {}. Error: {}", oldRoleName, newRoleName, error.getMessage())
-            );
-             */
-
             role.getManager().setName(newRoleName).setColor(color).queue(
                     success -> {
                         // assign the (renamed) role to the member
@@ -105,58 +98,4 @@ public class DiscordUtil {
                     );
         }
     }
-
-    /*
-    public void assignRole(Guild guild, Member member, String roleName, Color color) {
-        Optional<Role> existingRole = guild.getRolesByName(roleName, true).stream().findFirst();
-
-        if (existingRole.isPresent()) {
-            // assign existing role
-            guild.addRoleToMember(member, existingRole.get()).queue(
-                    success -> logger.info("Successfully assigned existing role {} to user {}", roleName, member.getId()),
-                    error -> logger.error("Failed to assign existing role {} to user {}. Error: {}", roleName, member.getId(), error.getMessage())
-            );
-        } else {
-            // create role and assign it
-            guild.createRole()
-                    .setName(roleName)
-                    .setColor(color)
-                    .setMentionable(true)
-                    .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
-                    .queue(
-                            role -> guild.addRoleToMember(member, role).queue(
-                                    success -> logger.info("Created and assigned new role {} to user {}", roleName, member.getId()),
-                                    error -> logger.error("Failed to assign new role {} to user {}. Error: {}", roleName, member.getId(), error.getMessage())
-                            ),
-                            error -> logger.error("Failed to create role {}. Error: {}", roleName, error.getMessage())
-                    );
-        }
-    }
-     */
-
-    /*
-    public void changeRole(Guild guild, String oldRoleName, String newRoleName, Color newColor) {
-        Optional<Role> roleToChange = guild.getRolesByName(oldRoleName, true).stream().findFirst();
-
-        if (roleToChange.isPresent()) {
-            // role exists, rename and change color
-            Role role = roleToChange.get();
-            role.getManager().setName(newRoleName).setColor(newColor).queue(
-                    success -> logger.info("Changed role {} to {}", oldRoleName, newRoleName),
-                    error -> logger.error("Failed to change role {} to {}. Error: {}", oldRoleName, newRoleName, error.getMessage())
-            );
-        } else {
-            // role does not exist, create a new one
-            guild.createRole()
-                    .setName(newRoleName)
-                    .setColor(newColor)
-                    .setMentionable(true)
-                    .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
-                    .queue(
-                            role -> logger.info("Created new role {}", newRoleName),
-                            error -> logger.error("Failed to create new role {}. Error: {}", newRoleName, error.getMessage())
-                    );
-        }
-    }
-     */
 }

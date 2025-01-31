@@ -12,5 +12,6 @@ import java.util.Optional;
 public interface ClientRepository extends JpaRepository<Client, Long>
 {
     Optional<Client> findByDiscordId(String discordId);
+    Optional<Client> findByDiscordName(String discordName);
     List<Client> findByEnrolment(Enrolment enrolment);
 }

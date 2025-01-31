@@ -13,9 +13,11 @@ import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
+import net.dv8tion.jda.api.events.user.update.UserUpdateNameEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -73,6 +75,19 @@ public class LoginHandler extends ListenerAdapter {
                             discordUtil.sendJsonToLogChannel();
                         }
                 );
+    }
+
+    @Override
+    public void onUserUpdateName(UserUpdateNameEvent event) {
+        // get the different usernames
+        String oldName = event.getOldName();
+        String newName = event.getNewName();
+
+        // only if unique username has changed
+        if (!oldName.equals(newName)) {
+            loginService.changeUsername(oldName, newName);
+            discordUtil.sendJsonToLogChannel();
+        }
     }
 
     private void assignRoles(VerificationClient verificationClient) {
