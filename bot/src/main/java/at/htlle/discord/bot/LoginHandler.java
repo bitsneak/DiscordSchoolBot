@@ -63,11 +63,13 @@ public class LoginHandler extends ListenerAdapter {
                             // set the left at attribute from the client
                             clientRepository.findByDiscordId(user.getId()).ifPresent(client -> {
                                 client.setLeftAt(LocalDateTime.now(ZoneOffset.UTC));
+                                client.setEnrolment(null);
+                                client.setProfession(null);
                                 clientRepository.save(client);
                                 logger.info("client: {} left the server", user.getId());
                             });
 
-                            // send JSON file of the db to the log channel
+                            // send JSON file to the log channel
                             discordUtil.sendJsonToLogChannel();
                         }
                 );
@@ -84,7 +86,7 @@ public class LoginHandler extends ListenerAdapter {
         loginService.persistClient(verificationClient);
         logger.info("Client {} persisted to database", verificationClient.getClient().getId());
 
-        // send JSON file of all server members to log channel
+        // send JSON file to the log channel
         discordUtil.sendJsonToLogChannel();
         logger.info("Sent client data for client {} to admin channel", verificationClient.getClient().getId());
 

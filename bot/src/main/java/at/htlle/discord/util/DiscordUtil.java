@@ -62,6 +62,51 @@ public class DiscordUtil {
         }
     }
 
+    public void assignOrChangeRole(Guild guild, Member member, String oldRoleName, String newRoleName, Color color) {
+        Optional<Role> existingRole = guild.getRolesByName(oldRoleName, true).stream().findFirst();
+
+        if (existingRole.isPresent()) {
+            // role exists, rename and change color
+            Role role = existingRole.get();
+
+            /*role.getManager().setName(newRoleName).setColor(color).queue(
+                    success -> logger.info("Changed role {} to {}", oldRoleName, newRoleName),
+                    error -> logger.error("Failed to change role {} to {}. Error: {}", oldRoleName, newRoleName, error.getMessage())
+            );
+             */
+
+            role.getManager().setName(newRoleName).setColor(color).queue(
+                    success -> {
+                        // assign the (renamed) role to the member
+                        guild.addRoleToMember(member, role).queue(
+                                successAssign -> logger.info("Successfully assigned renamed role {} to user {}", newRoleName, member.getId()),
+                                errorAssign -> logger.error("Failed to assign renamed role {} to user {}. Error: {}", newRoleName, member.getId(), errorAssign.getMessage())
+                        );
+                    },
+                    error -> logger.error("Failed to rename role {} to {}. Error: {}", oldRoleName, newRoleName, error.getMessage())
+            );
+
+        } else {
+            // role does not exist, create and assign the new role
+            guild.createRole()
+                    .setName(newRoleName)
+                    .setColor(color)
+                    .setMentionable(true)
+                    .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
+                    .queue(
+                            role -> {
+                                // assign the newly created role to the member
+                                guild.addRoleToMember(member, role).queue(
+                                        success -> logger.info("Created and assigned new role {} to user {}", newRoleName, member.getId()),
+                                        errorAssign -> logger.error("Failed to assign new role {} to user {}. Error: {}", newRoleName, member.getId(), errorAssign.getMessage())
+                                );
+                            },
+                            error -> logger.error("Failed to create new role {}. Error: {}", newRoleName, error.getMessage())
+                    );
+        }
+    }
+
+    /*
     public void assignRole(Guild guild, Member member, String roleName, Color color) {
         Optional<Role> existingRole = guild.getRolesByName(roleName, true).stream().findFirst();
 
@@ -87,4 +132,31 @@ public class DiscordUtil {
                     );
         }
     }
+     */
+
+    /*
+    public void changeRole(Guild guild, String oldRoleName, String newRoleName, Color newColor) {
+        Optional<Role> roleToChange = guild.getRolesByName(oldRoleName, true).stream().findFirst();
+
+        if (roleToChange.isPresent()) {
+            // role exists, rename and change color
+            Role role = roleToChange.get();
+            role.getManager().setName(newRoleName).setColor(newColor).queue(
+                    success -> logger.info("Changed role {} to {}", oldRoleName, newRoleName),
+                    error -> logger.error("Failed to change role {} to {}. Error: {}", oldRoleName, newRoleName, error.getMessage())
+            );
+        } else {
+            // role does not exist, create a new one
+            guild.createRole()
+                    .setName(newRoleName)
+                    .setColor(newColor)
+                    .setMentionable(true)
+                    .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
+                    .queue(
+                            role -> logger.info("Created new role {}", newRoleName),
+                            error -> logger.error("Failed to create new role {}. Error: {}", newRoleName, error.getMessage())
+                    );
+        }
+    }
+     */
 }

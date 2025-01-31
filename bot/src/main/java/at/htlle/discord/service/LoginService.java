@@ -5,22 +5,18 @@ import at.htlle.discord.jpa.repository.*;
 import at.htlle.discord.model.enums.*;
 import at.htlle.discord.model.VerificationClient;
 import at.htlle.discord.util.DiscordUtil;
-import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.User;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.awt.*;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Optional;
-import java.util.function.BiConsumer;
 
 @Service
 public class LoginService {
@@ -150,7 +146,7 @@ public class LoginService {
             Teacher teacher = teacherOptional.get();
 
             // get enrolment by teacher
-            Optional<Enrolment> enrolmentOptional = enrolmentRepository.findByClassTeacher(teacher);
+            Optional<Enrolment> enrolmentOptional = enrolmentRepository.findByTeacher(teacher);
             // no enrolment found for this class teacher
             if (enrolmentOptional.isEmpty()) {
                 discordUtil.sendPrivateMessage(verificationClient.getUser(), "No class registered for this teacher.");
@@ -179,26 +175,26 @@ public class LoginService {
         // assign client profession to user role
         Professions profession = client.getProfession().getName();
         switch (profession) {
-            case IT -> discordUtil.assignRole(guild, member, profession.getName(), Colors.IT.getColor());
-            case L -> discordUtil.assignRole(guild, member, profession.getName(), Colors.L.getColor());
-            case M -> discordUtil.assignRole(guild, member, profession.getName(), Colors.M.getColor());
-            case R -> discordUtil.assignRole(guild, member, profession.getName(), Colors.R.getColor());
+            case IT -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.IT.getColor());
+            case L -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.L.getColor());
+            case M -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.M.getColor());
+            case R -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.R.getColor());
         }
 
         // select if teacher or student
         if (client.getScholar().getName().equals(Scholars.STUDENT)) {
             // find and assign student role
             Scholar role = scholarRepository.findByName(Scholars.STUDENT).stream().findFirst().get();
-            discordUtil.assignRole(guild, member, role.getName().getName(), Colors.GENERIC.getColor());
+            discordUtil.assignOrChangeRole(guild, member, role.getName().getName(), role.getName().getName(), Colors.GENERIC.getColor());
 
             // assign client year to user role
-            discordUtil.assignRole(guild, member, "Year " + client.getEnrolment().getYear().getYear().getYear(), Colors.GENERIC.getColor());
+            discordUtil.assignOrChangeRole(guild, member, "Year " + client.getEnrolment().getYear().getYear().getYear(), "Year " + client.getEnrolment().getYear().getYear().getYear(), Colors.GENERIC.getColor());
             // assign client className to user role
-            discordUtil.assignRole(guild, member, client.getEnrolment().getName(), Colors.CLASS.getColor());
+            discordUtil.assignOrChangeRole(guild, member, client.getEnrolment().getName(), client.getEnrolment().getName(), Colors.CLASS.getColor());
         } else {
             // find and assign teacher role
             Scholar role = scholarRepository.findByName(Scholars.TEACHER).stream().findFirst().get();
-            discordUtil.assignRole(guild, member, role.getName().getName(), Colors.GENERIC.getColor());
+            discordUtil.assignOrChangeRole(guild, member, client.getEnrolment().getName(), role.getName().getName(), Colors.GENERIC.getColor());
         }
     }
 

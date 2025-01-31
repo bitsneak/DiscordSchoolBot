@@ -8,10 +8,11 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "client", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "enrolment_id", "profession_id", "scholar_id", "joined_at"}),
-        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "profession_id", "scholar_id", "joined_at"}),
-        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "enrolment_id", "profession_id", "scholar_id", "joined_at", "left_at"}),
-        @UniqueConstraint(columnNames = {"discord_id", "discord_name", "email", "profession_id", "scholar_id", "joined_at", "left_at"})
+        @UniqueConstraint(columnNames = {"discord_id", "enrolment_id"}),
+        @UniqueConstraint(columnNames = {"discord_id", "enrolment_id", "joined_at"}),
+        @UniqueConstraint(columnNames = {"discord_id", "profession_id"}),
+        @UniqueConstraint(columnNames = {"discord_id", "enrolment_id", "joined_at", "left_at"}),
+        @UniqueConstraint(columnNames = {"discord_name", "email", "scholar_id"})
 })
 @Getter
 @Setter
@@ -44,8 +45,7 @@ public class Client
     private Enrolment enrolment;
 
     @ManyToOne
-    @JoinColumn(name = "profession_id", nullable = false)
-    @NonNull
+    @JoinColumn(name = "profession_id")
     private Profession profession;
 
     @ManyToOne

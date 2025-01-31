@@ -1,6 +1,5 @@
 package at.htlle.discord.service;
 
-import at.htlle.discord.bot.LoginHandler;
 import at.htlle.discord.jpa.entity.Client;
 import at.htlle.discord.jpa.entity.Enrolment;
 import at.htlle.discord.jpa.entity.Teacher;
@@ -16,8 +15,6 @@ import at.htlle.discord.util.DiscordUtil;
 import lombok.Getter;
 import lombok.Setter;
 import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
-import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import org.apache.logging.log4j.LogManager;
@@ -53,17 +50,18 @@ public class CommandService {
 
     public void handleCommand(SlashCommandInteractionEvent event, BotCommands botCommand) {
         switch (botCommand) {
-            case ADD_CLASS_TEACHER -> handleAddClassTeacher(event);
-            case ADD_CLASS -> handleAddClass(event);
-            case CHANGE_CLASS_TEACHER -> handleChangeClassTeacher(event);
-            case CHANGE_CLASS_CLASS_TEACHER -> handleChangeClassClassTeacher(event);
-            case PRINT_CLASS_TEACHER -> handlePrintClassTeacher(event);
-            case PRINT_CLASS -> handlePrintClass(event);
-            case ROTATE -> handleRotate(event);
+            case ADD_CLASS_TEACHER -> addClassTeacher(event);
+            case ADD_CLASS -> addClass(event);
+            case CHANGE_CLASS_TEACHER -> changeClassTeacher(event);
+            case CHANGE_CLASS_CLASS_TEACHER -> changeClassTeacherFromClass(event);
+            case CHANGE_CLASS_NAME -> changeClassName(event);
+            case PRINT_CLASS_TEACHER -> printClassTeacher(event);
+            case PRINT_CLASS -> printClass(event);
+            case ROTATE -> rotate(event);
         }
     }
 
-    private void handleAddClassTeacher(SlashCommandInteractionEvent event) {
+    private void addClassTeacher(SlashCommandInteractionEvent event) {
         // get the abbreviation of the class teacher from the command option
         String abbreviation = Objects.requireNonNull(event.getOption(
                 BotCommands.ADD_CLASS_TEACHER.getOptions()
@@ -80,13 +78,13 @@ public class CommandService {
                         () ->
                         {
                             teacherRepository.save(new Teacher(abbreviation));
-                            event.reply("Added class teacher: " + abbreviation).queue();
+                            event.reply("Added class teacher: **" + abbreviation + "**").queue();
                             logger.info("Added class teacher: {}", abbreviation);
                         }
                 );
     }
 
-    private void handleAddClass(SlashCommandInteractionEvent event) {
+    private void addClass(SlashCommandInteractionEvent event) {
         List<String> optionValues = new ArrayList<>();
 
         // retrieve all the options for this command
@@ -100,7 +98,7 @@ public class CommandService {
 
         // check if the class name matches the pattern (starts with a number followed by other characters)
         if (!className.matches("^\\d\\D.*")) {
-            event.reply("Invalid class name format: **" + className + "**. Must start with a number followed by other characters").queue();
+            event.reply("Invalid class name format **" + className + "**. Must start with a number followed by other characters").queue();
             return;
         }
 
@@ -117,8 +115,8 @@ public class CommandService {
                             Teacher teacher = teacherOptional.get();
 
                             // check if teacher already has a class
-                            if (enrolmentRepository.findByClassTeacher(teacher).isPresent()) {
-                                event.reply("Class teacher **" + teacher.getAbbreviation() + "** has already a class").queue();
+                            if (enrolmentRepository.findByTeacher(teacher).isPresent()) {
+                                event.reply("Class teacher **" + teacher.getAbbreviation() + "** already has a class").queue();
                                 return;
                             }
 
@@ -143,13 +141,13 @@ public class CommandService {
 
                             // save enrolment
                             enrolmentRepository.save(new Enrolment(className, teacher, year));
-                            event.reply("Added class: **" + className + "** with teacher: **" + teacher.getAbbreviation() + "**").queue();
+                            event.reply("Added class **" + className + "** with teacher **" + teacher.getAbbreviation() + "**").queue();
                             logger.info("Added class: {} with teacher: {}", className, teacher.getAbbreviation());
                         }
                 );
     }
 
-    private void handleChangeClassTeacher(SlashCommandInteractionEvent event) {
+    private void changeClassTeacher(SlashCommandInteractionEvent event) {
         List<String> optionValues = new ArrayList<>();
 
         // retrieve all the options for this command
@@ -176,15 +174,65 @@ public class CommandService {
             oldTeacher.setAbbreviation(teacherAbbreviationNew);
             teacherRepository.save(oldTeacher);
 
-            event.reply("Renamed class teacher: **" + teacherAbbreviationOld + "** to: **" + teacherAbbreviationNew + "**").queue();
+            // send JSON file to the log channel
+            discordUtil.sendJsonToLogChannel();
+
+            event.reply("Renamed class teacher **" + teacherAbbreviationOld + "** to **" + teacherAbbreviationNew + "**").queue();
             logger.info("Renamed class teacher: {} to: {}", teacherAbbreviationOld, teacherAbbreviationNew);
         } else {
-            event.reply("Teacher abbreviation: **" + teacherAbbreviationOld + "** not found.").queue();
-            logger.error("Teacher abbreviation: {} not found for renaming.", teacherAbbreviationOld);
+            event.reply("Class teacher not found: **" + teacherAbbreviationOld + "**").queue();
+            logger.error("Class teacher abbreviation: {} not found for renaming.", teacherAbbreviationOld);
         }
     }
 
-    private void handleChangeClassClassTeacher(SlashCommandInteractionEvent event) {
+    private void changeClassName(SlashCommandInteractionEvent event) {
+        List<String> optionValues = new ArrayList<>();
+
+        // retrieve all the options for this command
+        BotCommands.CHANGE_CLASS_NAME.getOptions().forEach(option -> {
+            // add the option value dynamically based on the option name in the enum
+            optionValues.add(Objects.requireNonNull(event.getOption(option.name())).getAsString());
+        });
+
+        String enrolmentNameOld = optionValues.getFirst().toUpperCase();
+        String enrolmentNameNew = optionValues.get(1).toUpperCase();
+
+        // check if the new enrolment name already exists
+        Optional<Enrolment> existingNewEnrolment = enrolmentRepository.findByName(enrolmentNameNew);
+        if (existingNewEnrolment.isPresent()) {
+            event.reply("Class already exists: **" + enrolmentNameNew + "**").queue();
+            return;
+        }
+
+        // check if the old enrolment exists
+        Optional<Enrolment> existingOldEnrolment = enrolmentRepository.findByName(enrolmentNameOld);
+        if (existingOldEnrolment.isPresent()) {
+            Enrolment newEnrolment = existingOldEnrolment.get();
+
+            // rename enrolment
+            newEnrolment.setName(enrolmentNameNew);
+            enrolmentRepository.save(newEnrolment);
+
+            // reset class teacher of now old class
+            //Enrolment oldEnrolment = enrolmentRepository.findByName(enrolmentNameOld).get();
+            //oldEnrolment.setTeacher(null);
+            //enrolmentRepository.save(newEnrolment);
+
+            // change the corresponding Discord role
+            discordUtil.assignOrChangeRole(event.getGuild(), event.getMember(), enrolmentNameOld, enrolmentNameNew, Colors.CLASS.getColor());
+
+            // send JSON file to the log channel
+            discordUtil.sendJsonToLogChannel();
+
+            event.reply("Renamed class from **" + enrolmentNameOld + "** to **" + enrolmentNameNew + "**").queue();
+            logger.info("Renamed class: {} to: {}", enrolmentNameOld, enrolmentNameNew);
+        } else {
+            event.reply("Class not found: **" + enrolmentNameOld + "**").queue();
+            logger.error("Class: {} not found for renaming.", enrolmentNameOld);
+        }
+    }
+
+    private void changeClassTeacherFromClass(SlashCommandInteractionEvent event) {
         List<String> optionValues = new ArrayList<>();
 
         // retrieve all the options for this command
@@ -194,7 +242,7 @@ public class CommandService {
         });
 
         String className = optionValues.getFirst().toUpperCase();
-        String teacherAbbreviation = optionValues.get(1).toUpperCase();
+        String teacherAbbreviationNew = optionValues.get(1).toUpperCase();
 
         // check if the class exists
         Optional<Enrolment> existingEnrolment = enrolmentRepository.findByName(className);
@@ -204,60 +252,73 @@ public class CommandService {
         }
 
         // check if the teacher exists
-        Optional<Teacher> existingNewTeacher = teacherRepository.findByAbbreviation(teacherAbbreviation);
+        Optional<Teacher> existingNewTeacher = teacherRepository.findByAbbreviation(teacherAbbreviationNew);
         if (existingNewTeacher.isEmpty()) {
-            event.reply("Class teacher not found: **" + teacherAbbreviation + "**").queue();
+            event.reply("Class teacher not found: **" + teacherAbbreviationNew + "**").queue();
             return;
         }
 
-        // get the enrolment and teacher
-        Enrolment enrolment = existingEnrolment.get();
+        // check if the teacher already has an enrolment
         Teacher newTeacher = existingNewTeacher.get();
+        Optional<Enrolment> existingTeacherEnrolment = enrolmentRepository.findByTeacher(newTeacher);
+        if (existingTeacherEnrolment.isPresent()) {
+            event.reply("Class teacher **" + newTeacher.getAbbreviation() + "** already has class **" + existingTeacherEnrolment.get().getName() + "**").queue();
+            return;
+        }
+
+        // get the enrolment
+        Enrolment enrolment = existingEnrolment.get();
+        String teacherAbbreviationOld = enrolment.getTeacher() == null ? "No teacher" : enrolment.getTeacher().getAbbreviation();
 
         // update the class teacher and enrolment
-        enrolment.setClassTeacher(newTeacher);
+        enrolment.setTeacher(newTeacher);
         enrolmentRepository.save(enrolment);
 
-        event.reply("Class teacher changed for: **" + className + "** to: **" + teacherAbbreviation + "**").queue();
-        logger.info("Class teacher changed for: {} to: {}", className, teacherAbbreviation);
+        // send JSON file to the log channel
+        discordUtil.sendJsonToLogChannel();
+
+        event.reply("Class teacher changed for class **" + className + "** from **" + teacherAbbreviationOld + "** to **" + teacherAbbreviationNew + "**").queue();
+        logger.info("Class teacher changed for class: {} from: {} to: {}", className, teacherAbbreviationOld, teacherAbbreviationNew);
     }
 
-    private void handlePrintClassTeacher(SlashCommandInteractionEvent event) {
+    private void printClassTeacher(SlashCommandInteractionEvent event) {
         List<Teacher> teachers = teacherRepository.findAll();
 
         // check if there are any teachers
         if (teachers.isEmpty()) {
-            event.reply("No class teachers found.").queue();
+            event.reply("No class teachers found").queue();
             return;
         }
 
         // format teachers
         String teacherNames = teachers.stream()
-                .map(Teacher::getAbbreviation)
+                .sorted(Comparator.comparing(Teacher::getAbbreviation))
+                .map(teacher -> "- " + teacher.getAbbreviation())
                 .collect(Collectors.joining("\n"));
 
         event.reply("**Class teachers**\n" + teacherNames).queue();
     }
 
-    private void handlePrintClass(SlashCommandInteractionEvent event) {
+    private void printClass(SlashCommandInteractionEvent event) {
         List<Enrolment> enrolments = enrolmentRepository.findAll();
 
         // check if there are any classes
         if (enrolments.isEmpty()) {
-            event.reply("No classes found.").queue();
+            event.reply("No classes found").queue();
             return;
         }
 
         // format enrolments with their class teachers
         String classList = enrolments.stream()
-                .map(enrolment -> enrolment.getName() + " - " +
-                        enrolment.getClassTeacher().getAbbreviation())
+                .sorted(Comparator.comparing(Enrolment::getName))
+                .map(enrolment -> "- " + enrolment.getName() + ": " +
+                        (enrolment.getTeacher() != null ? enrolment.getTeacher().getAbbreviation() : "No teacher"))
                 .collect(Collectors.joining("\n"));
 
         event.reply("**Classes and class teachers**\n" + classList).queue();
     }
 
-    private void handleRotate(SlashCommandInteractionEvent event) {
+    private void rotate(SlashCommandInteractionEvent event) {
         List<Enrolment> allEnrolments = enrolmentRepository.findAll();
         Guild guild = event.getGuild();
 
@@ -269,8 +330,8 @@ public class CommandService {
         // separate non final year enrolments
         List<Enrolment> nonFinalYearEnrolments = allEnrolments.stream()
                 .filter(e -> e.getYear().getYear().getNextYear() != null)
-                .toList()
-                .reversed();
+                .sorted((e1, e2) -> e2.getYear().getYear().compareTo(e1.getYear().getYear())) // sorting by year in descending order
+                .toList();
 
         // handle final year enrolments
         for (Enrolment enrolment : finalYearEnrolments) {
@@ -295,8 +356,12 @@ public class CommandService {
                     .findFirst()
                     .ifPresent(role -> role.delete().queue(
                             success -> logger.info("Deleted role: {}", roleName),
-                            failure -> logger.error("Failed to delete role {}. Error: {}", roleName, failure.getMessage())
+                            failure -> logger.error("Failed to delete role: {}. Error: {}", roleName, failure.getMessage())
                     ));
+
+            // remove the teacher from the enrolment
+            enrolment.setTeacher(null);
+            enrolmentRepository.save(enrolment);
         }
 
         // promote non final year enrolments
@@ -312,15 +377,22 @@ public class CommandService {
             String oldClassRoleName = enrolment.getName();
             String newClassRoleName = nextYear.getYear() + oldClassRoleName.substring(1);
 
+            // the current class teacher
+            Teacher teacher = enrolment.getTeacher();
+
+            // delete the teacher from old year
+            enrolment.setTeacher(null);
+            enrolmentRepository.save(enrolment);
+
             // check if the new class already exists
             Enrolment nextEnrolment = enrolmentRepository.findByName(newClassRoleName)
                     .orElseGet(() -> {
                         // if the class does not exist, create it with the same teacher as the previous class
-                        return enrolmentRepository.save(new Enrolment(newClassRoleName, enrolment.getClassTeacher(), nextYearEntity));
+                        return enrolmentRepository.save(new Enrolment(newClassRoleName, teacher, nextYearEntity));
                     });
 
             // ensure the teacher is always updated
-            nextEnrolment.setClassTeacher(enrolment.getClassTeacher());
+            nextEnrolment.setTeacher(teacher);
             enrolmentRepository.save(nextEnrolment);
 
             // move students to the new enrolment
@@ -333,9 +405,9 @@ public class CommandService {
             guild.getRolesByName(oldClassRoleName, true).stream()
                     .findFirst()
                     .ifPresentOrElse(role -> role.getManager().setName(newClassRoleName).queue(
-                            success -> logger.info("Renamed class role {} to {}", oldClassRoleName, newClassRoleName),
-                            error -> logger.error("Failed to rename class role {}. Error: {}", oldClassRoleName, error.getMessage())
-                    ), () -> logger.info("Class role {} not found to rename", oldClassRoleName));
+                            success -> logger.info("Renamed class role: {} to: {}", oldClassRoleName, newClassRoleName),
+                            error -> logger.error("Failed to rename class role: {}. Error: {}", oldClassRoleName, error.getMessage())
+                    ), () -> logger.info("Class role: {} not found to rename", oldClassRoleName));
 
             // assign new year role and remove old one
             String oldYearRoleName = "Year " + currentYear.getYear();
@@ -349,20 +421,21 @@ public class CommandService {
                             guild.getRolesByName(oldYearRoleName, true).stream()
                                     .findFirst()
                                     .ifPresent(role -> guild.removeRoleFromMember(member, role).queue(
-                                            success -> logger.info("Removed old year role {} from user {}", oldYearRoleName, discordId),
-                                            error -> logger.error("Failed to remove old year role {} from user {}. Error: {}", oldYearRoleName, discordId, error.getMessage())
+                                            success -> logger.info("Removed old year role: {} from user: {}", oldYearRoleName, discordId),
+                                            error -> logger.error("Failed to remove old year role: {} from user: {}. Error: {}", oldYearRoleName, discordId, error.getMessage())
                                     ));
 
                             // assign new year role
-                            discordUtil.assignRole(guild, member, newYearRoleName, Colors.GENERIC.getColor());
+                            discordUtil.assignOrChangeRole(guild, member, newYearRoleName, newYearRoleName, Colors.GENERIC.getColor());
                         },
                         failure -> logger.debug("Member not found: {}", discordId)
                 );
             }
         }
 
+        // send JSON file to the log channel
         discordUtil.sendJsonToLogChannel();
-        event.reply("Rotate command executed.").queue();
-        logger.info(event.getCommandString() + " command executed by {}", event.getUser().getIdLong());
+        event.reply("Rotate command executed").queue();
+        logger.info(event.getCommandString() + " command executed by: {}", event.getUser().getIdLong());
     }
 }

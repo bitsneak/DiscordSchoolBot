@@ -27,6 +27,7 @@ public class CommandInitializer {
                 .slash(BotCommands.CHANGE_CLASS_CLASS_TEACHER.getCommand(), "Change a class or class teacher")
                 .addSubcommands(
                         createSubcommand(BotCommands.CHANGE_CLASS_TEACHER),
+                        createSubcommand(BotCommands.CHANGE_CLASS_NAME),
                         createSubcommand(BotCommands.CHANGE_CLASS_CLASS_TEACHER)
                 ));
 

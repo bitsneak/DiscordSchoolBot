@@ -22,15 +22,23 @@ public enum BotCommands {
             )),
     CHANGE_CLASS_TEACHER(
             "change",
-            "class-teacher",
+            "class-teacher-name",
             "Change the name of an existing class teacher",
             List.of(
                     new CommandOption("teacher-abbreviation-old", "The old abbreviation of the class teacher", true),
                     new CommandOption("teacher-abbreviation-new", "The new abbreviation of the class teacher", true)
             )),
+    CHANGE_CLASS_NAME(
+            "change",
+            "class-name",
+            "Change the name of an existing class",
+            List.of(
+                    new CommandOption("class-name-old", "The old name of the class", true),
+                    new CommandOption("class-name-new", "The new name of the class", true)
+            )),
     CHANGE_CLASS_CLASS_TEACHER(
             "change",
-            "class",
+            "class-teacher",
             "Change the class teacher of an existing class",
             List.of(
                     new CommandOption("class", "The name of the class", true),

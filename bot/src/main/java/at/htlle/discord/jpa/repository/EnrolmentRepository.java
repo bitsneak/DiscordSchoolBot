@@ -10,5 +10,5 @@ import java.util.Optional;
 @Repository
 public interface EnrolmentRepository extends JpaRepository<Enrolment, Long> {
     Optional<Enrolment> findByName(String name);
-    Optional<Enrolment> findByClassTeacher(Teacher teacher);
+    Optional<Enrolment> findByTeacher(Teacher teacher);
 }
