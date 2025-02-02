@@ -1,6 +1,6 @@
 package at.htlle.discord.jpa.entity;
 
-import at.htlle.discord.model.enums.Scholars;
+import at.htlle.discord.enums.Scholars;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -13,8 +13,8 @@ import lombok.*;
 @AllArgsConstructor
 @EqualsAndHashCode
 @ToString
-public class Scholar
-{
+public class Scholar {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")

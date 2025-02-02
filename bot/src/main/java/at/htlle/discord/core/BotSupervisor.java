@@ -1,16 +1,14 @@
-package at.htlle.discord.bot;
+package at.htlle.discord.core;
 
-import at.htlle.discord.model.enums.BotCommands;
+import at.htlle.discord.handler.CommandHandler;
+import at.htlle.discord.handler.LoginHandler;
 import at.htlle.discord.util.DiscordUtil;
 import jakarta.annotation.PostConstruct;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
-import net.dv8tion.jda.api.interactions.commands.build.Commands;
-import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -18,8 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 
 @Component
 public class BotSupervisor extends ListenerAdapter {
@@ -33,9 +30,6 @@ public class BotSupervisor extends ListenerAdapter {
 
     @Autowired
     private CommandHandler commandBot;
-
-    @Autowired
-    private CommandInitializer commandInitializer;
 
     @Autowired
     private DiscordUtil discordUtil;
@@ -78,14 +72,16 @@ public class BotSupervisor extends ListenerAdapter {
                 }
 
                 if (channel.getName().equals(commandChannelName)) {
-                    commandBot.getCommandService().setCommandChannel(channel);
+                    commandBot.setCommandChannel(channel);
                     logger.info("Bot channel set: {}", channel.getName());
                 }
             });
         });
 
+        // get all commands
+        List<CommandData> commands = commandBot.getCommandService().initializeCommands(commandBot.getCommandService().getCommandActions());
         // register commands
-        jda.updateCommands().addCommands(commandInitializer.initializeCommands()).queue(success -> {
+        jda.updateCommands().addCommands(commands).queue(success -> {
             logger.info("Commands successfully registered.");
         }, error -> {
             logger.error("Failed to register commands: {}", error.getMessage(), error);

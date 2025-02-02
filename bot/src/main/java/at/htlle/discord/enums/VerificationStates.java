@@ -1,4 +1,4 @@
-package at.htlle.discord.model.enums;
+package at.htlle.discord.enums;
 
 public enum VerificationStates {
     AWAIT_EMAIL,

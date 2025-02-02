@@ -1,8 +1,10 @@
-package at.htlle.discord.bot;
+package at.htlle.discord.handler;
 
-import at.htlle.discord.model.enums.BotCommands;
-import at.htlle.discord.service.CommandService;
+import at.htlle.discord.command.Commands;
+import at.htlle.discord.command.CommandService;
 import lombok.Getter;
+import lombok.Setter;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.apache.logging.log4j.LogManager;
@@ -19,9 +21,12 @@ public class CommandHandler extends ListenerAdapter {
     @Getter
     private CommandService commandService;
 
+    @Setter
+    private TextChannel commandChannel;
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        if (!event.getChannel().equals(commandService.getCommandChannel())) {
+        if (!event.getChannel().equals(commandChannel)) {
             return; // ignore commands from other channels
         }
 
@@ -29,7 +34,7 @@ public class CommandHandler extends ListenerAdapter {
         String subcommand = event.getSubcommandName();
 
         // check if the command is a valid bot command
-        for (BotCommands botCommand : BotCommands.values()) {
+        for (Commands botCommand : Commands.values()) {
             if (botCommand.matches(command, subcommand)) {
                 commandService.handleCommand(event, botCommand);
                 return;
@@ -37,6 +42,6 @@ public class CommandHandler extends ListenerAdapter {
         }
 
         event.reply("Unknown command.").queue();
-        logger.debug("Unhandled command: {} (subcommand: {})", command, subcommand);
+        logger.debug("Unknown command: {} (subcommand: {})", command, subcommand);
     }
 }

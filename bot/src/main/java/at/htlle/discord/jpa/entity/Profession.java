@@ -1,6 +1,5 @@
 package at.htlle.discord.jpa.entity;
 
-import at.htlle.discord.model.enums.Professions;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -13,15 +12,14 @@ import lombok.*;
 @AllArgsConstructor
 @EqualsAndHashCode
 @ToString
-public class Profession
-{
+public class Profession {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
     @Column(name = "name", nullable = false, unique = true)
-    @Enumerated(EnumType.STRING)
     @NonNull
-    private Professions name;
+    private String name;
 }

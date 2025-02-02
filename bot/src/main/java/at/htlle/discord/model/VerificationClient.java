@@ -1,7 +1,7 @@
 package at.htlle.discord.model;
 
 import at.htlle.discord.jpa.entity.Client;
-import at.htlle.discord.model.enums.VerificationStates;
+import at.htlle.discord.enums.VerificationStates;
 import lombok.*;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.User;

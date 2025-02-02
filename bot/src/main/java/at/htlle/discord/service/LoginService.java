@@ -1,8 +1,8 @@
 package at.htlle.discord.service;
 
+import at.htlle.discord.enums.Scholars;
 import at.htlle.discord.jpa.entity.*;
 import at.htlle.discord.jpa.repository.*;
-import at.htlle.discord.model.enums.*;
 import at.htlle.discord.model.VerificationClient;
 import at.htlle.discord.util.DiscordUtil;
 import net.dv8tion.jda.api.entities.Guild;
@@ -46,17 +46,17 @@ public class LoginService {
     private EnrolmentRepository enrolmentRepository;
 
     @Autowired
-    private TeacherRepository teacherRepository;
+    private ProfessionRepository professionRepository;
 
     @Autowired
-    private ProfessionRepository professionRepository;
+    private TeacherRepository teacherRepository;
 
     @Autowired
     private ScholarRepository scholarRepository;
 
     public boolean handleEmailInput(VerificationClient verificationClient, String email) {
         if (!email.matches(EMAIL_STUDENT_REGEX) && !email.matches(EMAIL_TEACHER_REGEX)) {
-            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter a valid school email address.");
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Enter a valid school email address.");
             return false;
         }
 
@@ -101,7 +101,7 @@ public class LoginService {
         }
 
         if (isCodeValid) {
-            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter your profession. One out of " + Arrays.toString(Professions.values()));
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Please enter your profession. One out of: " + allProfessionNames());
             logger.info("Code found for user: {}. Entered email is correct.", verificationClient.getUser().getId());
             return true;
         }
@@ -111,27 +111,18 @@ public class LoginService {
     }
 
     public boolean handleProfessionInput(VerificationClient verificationClient, String profession) {
-        if (Arrays.stream(Professions.values()).anyMatch(p -> p.getName().equalsIgnoreCase(profession))) {
-            // get enum profession from profession name
-            Professions professionEnum = Professions.valueOf(profession.toUpperCase());
-            Client client = verificationClient.getClient();
-
-            // find or create profession
-            professionRepository.findByName(professionEnum).ifPresentOrElse(
-                    client::setProfession,
-                    () -> {
-                        Profession professionEntity = new Profession(professionEnum);
-                        professionRepository.save(professionEntity);
-                        client.setProfession(professionEntity);
-                    }
-            );
-
-            logger.info("Profession found for user: {}", verificationClient.getUser().getId());
-            return true;
+        // find the profession
+        Optional<Profession> professionEntity = professionRepository.findByName(profession);
+        if (professionEntity.isEmpty()) {
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Invalid profession. Enter one out of: " + allProfessionNames());
+            return false;
         }
 
-        discordUtil.sendPrivateMessage(verificationClient.getUser(), "Invalid profession. Please enter one out of " + Arrays.toString(Professions.values()));
-        return false;
+        Client client = verificationClient.getClient();
+        client.setProfession(professionEntity.get());
+
+        logger.info("Profession {} set for user: {}", profession, verificationClient.getUser().getId());
+        return true;
     }
 
     public boolean handleTeacherInput(VerificationClient verificationClient, String abbreviation) {
@@ -165,33 +156,67 @@ public class LoginService {
 
     public void assignRoles(VerificationClient verificationClient) {
         User user = verificationClient.getUser();
-        Client client = verificationClient.getClient();
         Guild guild = verificationClient.getGuild();
         Member member = guild.retrieveMember(user).complete();
+        Client client = verificationClient.getClient();
 
-        // assign client profession to user role
-        Professions profession = client.getProfession().getName();
-        switch (profession) {
-            case IT -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.IT.getColor());
-            case L -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.L.getColor());
-            case M -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.M.getColor());
-            case R -> discordUtil.assignOrChangeRole(guild, member, profession.getName(), profession.getName(), Colors.R.getColor());
-        }
+        // create / assign client profession as user role
+        String profession = client.getProfession().getName();
+        guild.getRolesByName(profession, true).stream()
+                .findFirst()
+                .ifPresentOrElse(
+                        r -> discordUtil.assignRole(guild, member, r.getName()),
+                        () -> discordUtil.createRole(guild, profession, discordUtil.findColorForName(profession), createdRole -> {
+                            discordUtil.assignRole(guild, member, createdRole.getName());
+                        })
+                );
 
         // select if teacher or student
         if (client.getScholar().getName().equals(Scholars.STUDENT)) {
-            // find and assign student role
-            Scholar role = scholarRepository.findByName(Scholars.STUDENT).stream().findFirst().get();
-            discordUtil.assignOrChangeRole(guild, member, role.getName().getName(), role.getName().getName(), Colors.GENERIC.getColor());
+            // create / assign student role
+            String role = scholarRepository.findByName(Scholars.STUDENT).stream().findFirst().get().getName().getName();
+            guild.getRolesByName(role, true).stream()
+                    .findFirst()
+                    .ifPresentOrElse(
+                            r -> discordUtil.assignRole(guild, member, r.getName()),
+                            () -> discordUtil.createRole(guild, role, discordUtil.findColorForName(role), createdRole -> {
+                                discordUtil.assignRole(guild, member, createdRole.getName());
+                            })
+                    );
 
-            // assign client year to user role
-            discordUtil.assignOrChangeRole(guild, member, "Year " + client.getEnrolment().getYear().getYear(), "Year " + client.getEnrolment().getYear().getYear(), Colors.GENERIC.getColor());
-            // assign client className to user role
-            discordUtil.assignOrChangeRole(guild, member, client.getEnrolment().getName(), client.getEnrolment().getName(), Colors.CLASS.getColor());
+            String year = String.valueOf(client.getEnrolment().getYear().getYear());
+            String enrolment = client.getEnrolment().getName();
+
+            // create / assign client year to user role
+            guild.getRolesByName("Year " + year, true).stream()
+                    .findFirst()
+                    .ifPresentOrElse(
+                            r -> discordUtil.assignRole(guild, member, r.getName()),
+                            () -> discordUtil.createRole(guild, "Year " + year, discordUtil.findColorForName("Year " + year), createdRole -> {
+                                discordUtil.assignRole(guild, member, createdRole.getName());
+                            })
+                    );
+
+            // create / assign client className to user role
+            guild.getRolesByName(enrolment, true).stream()
+                    .findFirst()
+                    .ifPresentOrElse(
+                            r -> discordUtil.assignRole(guild, member, r.getName()),
+                            () -> discordUtil.createRole(guild, enrolment, discordUtil.findColorForName(enrolment), createdRole -> {
+                                discordUtil.assignRole(guild, member, createdRole.getName());
+                            })
+                    );
         } else {
-            // find and assign teacher role
-            Scholar role = scholarRepository.findByName(Scholars.TEACHER).stream().findFirst().get();
-            discordUtil.assignOrChangeRole(guild, member, client.getEnrolment().getName(), role.getName().getName(), Colors.GENERIC.getColor());
+            // find / create teacher role
+            String role = scholarRepository.findByName(Scholars.TEACHER).stream().findFirst().get().getName().getName();
+            guild.getRolesByName(role, true).stream()
+                    .findFirst()
+                    .ifPresentOrElse(
+                            r -> discordUtil.assignRole(guild, member, r.getName()),
+                            () -> discordUtil.createRole(guild, role, discordUtil.findColorForName(role), createdRole -> {
+                                discordUtil.assignRole(guild, member, createdRole.getName());
+                            })
+                    );
         }
     }
 
@@ -213,8 +238,7 @@ public class LoginService {
 
                     if (existingClient.getScholar().getName().equals(Scholars.STUDENT)) {
                         existingClient.setEnrolment(client.getEnrolment());
-                    }
-                    else {
+                    } else {
                         existingClient.setEnrolment(null);
                     }
 
@@ -233,5 +257,12 @@ public class LoginService {
         clientRepository.findByDiscordName(oldName)
                 .ifPresent(client -> client.setDiscordName(newName));
         logger.info("User renamed from: {} to: {}", oldName, newName);
+    }
+
+    private String allProfessionNames() {
+        return String.join(", ", professionRepository.findAll()
+                .stream()
+                .map(Profession::getName)
+                .toList());
     }
 }

@@ -2,7 +2,8 @@ package at.htlle.discord.util;
 
 import at.htlle.discord.jpa.entity.Client;
 import at.htlle.discord.jpa.repository.ClientRepository;
-import at.htlle.discord.service.LoginService;
+import at.htlle.discord.jpa.repository.ColorRepository;
+import at.htlle.discord.enums.Colors;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Setter;
 import net.dv8tion.jda.api.Permission;
@@ -26,6 +27,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 @Component
 public class DiscordUtil {
@@ -39,6 +41,9 @@ public class DiscordUtil {
 
     @Autowired
     private ClientRepository clientRepository;
+
+    @Autowired
+    private ColorRepository colorRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -62,40 +67,78 @@ public class DiscordUtil {
         }
     }
 
-    public void assignOrChangeRole(Guild guild, Member member, String oldRoleName, String newRoleName, Color color) {
+    public java.awt.Color findColorForName(String scope) {
+        return colorRepository.findByScope(scope)
+                .map(at.htlle.discord.jpa.entity.Color::getColor) // extract hex string from color entity
+                .map(java.awt.Color::decode) // convert hex string to java.awt.Color
+                .orElse(Colors.GENERIC.getColor()); // default color if not found
+    }
+
+    public boolean createRole(Guild guild, String roleName, Color color, Consumer<Role> onSuccess) {
+        Optional<Role> existingRole = guild.getRolesByName(roleName, true).stream().findFirst();
+
+        // check if the role already exists
+        if (existingRole.isPresent()) {
+            return false;
+        }
+
+        // create new role
+        guild.createRole()
+                .setName(roleName)
+                .setColor(color)
+                .setMentionable(true)
+                .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
+                .queue(
+                        role -> {
+                            logger.info("Created role: {}", roleName);
+                            if (onSuccess != null) {
+                                onSuccess.accept(role);
+                            }
+                        },
+                        error -> logger.error("Failed to create role: {}. Error: {}", roleName, error.getMessage())
+                );
+        return true;
+    }
+
+    public boolean assignRole(Guild guild, Member member, String roleName) {
+        Optional<Role> existingRole = guild.getRolesByName(roleName, true).stream().findFirst();
+
+        // check if the role exists
+        if (existingRole.isEmpty()) {
+            return false;
+        }
+
+        // assign role
+        existingRole.ifPresent(role -> guild.addRoleToMember(member, role).queue(
+                success -> logger.info("Assigned role {} to user {}", roleName, member.getId()),
+                error -> logger.error("Failed to assign role {} to user {}. Error: {}", roleName, member.getId(), error.getMessage())
+        ));
+        return true;
+    }
+
+    public boolean changeRole(Guild guild, String oldRoleName, String newRoleName, Color color) {
         Optional<Role> existingRole = guild.getRolesByName(oldRoleName, true).stream().findFirst();
 
-        if (existingRole.isPresent()) {
-            // role exists, rename and change color
-            Role role = existingRole.get();
-            role.getManager().setName(newRoleName).setColor(color).queue(
-                    success -> {
-                        // assign the (renamed) role to the member
-                        guild.addRoleToMember(member, role).queue(
-                                successAssign -> logger.info("Successfully assigned renamed role {} to user {}", newRoleName, member.getId()),
-                                errorAssign -> logger.error("Failed to assign renamed role {} to user {}. Error: {}", newRoleName, member.getId(), errorAssign.getMessage())
-                        );
-                    },
-                    error -> logger.error("Failed to rename role {} to {}. Error: {}", oldRoleName, newRoleName, error.getMessage())
-            );
-
-        } else {
-            // role does not exist, create and assign the new role
-            guild.createRole()
-                    .setName(newRoleName)
-                    .setColor(color)
-                    .setMentionable(true)
-                    .setPermissions(Permission.MESSAGE_HISTORY, Permission.MESSAGE_SEND, Permission.MESSAGE_ADD_REACTION, Permission.VIEW_CHANNEL)
-                    .queue(
-                            role -> {
-                                // assign the newly created role to the member
-                                guild.addRoleToMember(member, role).queue(
-                                        success -> logger.info("Created and assigned new role {} to user {}", newRoleName, member.getId()),
-                                        errorAssign -> logger.error("Failed to assign new role {} to user {}. Error: {}", newRoleName, member.getId(), errorAssign.getMessage())
-                                );
-                            },
-                            error -> logger.error("Failed to create new role {}. Error: {}", newRoleName, error.getMessage())
-                    );
+        // check if the role exists
+        if (existingRole.isEmpty()) {
+            return false;
         }
+
+        // change role
+        existingRole.ifPresent(role -> role.getManager().setName(newRoleName).setColor(color).queue(
+                success -> logger.info("Changed role from: {} to: {} with color: {}", oldRoleName, newRoleName, color.getRGB()),
+                error -> logger.error("Failed to change role from: {} to: {} with color: {}. Error: {}", oldRoleName, oldRoleName, color.getRGB(), error.getMessage())
+        ));
+        return true;
+    }
+
+    // only change color
+    public boolean changeRole(Guild guild, String roleName, Color color) {
+        return changeRole(guild, roleName, roleName, color);
+    }
+
+    // only change name
+    public boolean changeRole(Guild guild, String oldRoleName, String newRoleName) {
+        return changeRole(guild, oldRoleName, newRoleName, findColorForName(oldRoleName));
     }
 }

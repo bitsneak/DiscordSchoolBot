@@ -1,10 +1,10 @@
-package at.htlle.discord.bot;
+package at.htlle.discord.handler;
 
 import at.htlle.discord.jpa.entity.Client;
 import at.htlle.discord.jpa.repository.ClientRepository;
 import at.htlle.discord.model.VerificationClient;
-import at.htlle.discord.model.enums.Scholars;
-import at.htlle.discord.model.enums.VerificationStates;
+import at.htlle.discord.enums.Scholars;
+import at.htlle.discord.enums.VerificationStates;
 import at.htlle.discord.service.LoginService;
 import at.htlle.discord.util.DiscordUtil;
 import lombok.Getter;
@@ -17,7 +17,6 @@ import net.dv8tion.jda.api.events.user.update.UserUpdateNameEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 

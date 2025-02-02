@@ -24,5 +24,4 @@ public class Teacher {
     @Column(name = "abbreviation", nullable = false, unique = true)
     @NonNull
     private String abbreviation;
-
 }

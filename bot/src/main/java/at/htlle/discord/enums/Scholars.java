@@ -1,4 +1,4 @@
-package at.htlle.discord.model.enums;
+package at.htlle.discord.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -6,8 +6,8 @@ import lombok.Getter;
 @Getter
 @AllArgsConstructor
 public enum Scholars {
-    TEACHER("Lehrer"),
-    STUDENT("Schüler");
+    TEACHER("Teacher"),
+    STUDENT("Student");
 
     private final String name;
 }
