@@ -2,10 +2,10 @@
 
     <!-- Define a Rolling File Appender for INFO logs -->
     <appender name="INFO_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/application-info.log</file>
+        <file>log/application-info.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- Rotate daily -->
-            <fileNamePattern>logs/application-info-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>log/application-info-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>
@@ -15,10 +15,10 @@
 
     <!-- Define a Rolling File Appender for ERROR logs -->
     <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>logs/application-error.log</file>
+        <file>log/application-error.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <!-- Rotate daily -->
-            <fileNamePattern>logs/application-error-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <fileNamePattern>log/application-error-%d{yyyy-MM-dd}.log</fileNamePattern>
             <maxHistory>30</maxHistory>
         </rollingPolicy>
         <encoder>

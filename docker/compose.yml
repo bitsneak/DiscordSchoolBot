@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   bot:
     build:
@@ -10,5 +8,5 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./log:/app/log
-      - ./db:/app/db
+      - ./log:/app/log:rw
+      - ./db:/app/db:rw
