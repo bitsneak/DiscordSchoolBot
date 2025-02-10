@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "year")
+@Table(name = "period")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -15,11 +15,11 @@ import lombok.*;
 public class Year {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "year", nullable = false, unique = true)
+    @Column(name = "period", nullable = false, unique = true)
     @NonNull
     private Integer year;
 }

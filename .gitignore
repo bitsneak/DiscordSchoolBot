@@ -37,4 +37,5 @@
 .env
 
 ### Database ###
-db/
+.db
+**db/

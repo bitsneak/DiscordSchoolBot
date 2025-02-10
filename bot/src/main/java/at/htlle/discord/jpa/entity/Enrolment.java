@@ -4,9 +4,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "class", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"name", "year_id"}),
-        @UniqueConstraint(columnNames = {"name", "teacher_id", "year_id"})
+@Table(name = "enrolment", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"name", "period_id"}),
+        @UniqueConstraint(columnNames = {"name", "teacher_id", "period_id"})
 })
 @Getter
 @Setter
@@ -24,7 +24,7 @@ public class Enrolment {
     }
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.AUTO)
     @Column(name = "id")
     private Long id;
 
@@ -37,7 +37,7 @@ public class Enrolment {
     private Teacher teacher;
 
     @ManyToOne
-    @JoinColumn(name = "year_id", nullable = false)
+    @JoinColumn(name = "peroid_id", nullable = false)
     @NonNull
     private Year year;
 }
