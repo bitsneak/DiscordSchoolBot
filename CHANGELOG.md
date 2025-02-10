@@ -1,3 +1,10 @@
+## 1.2.0 (2025-02-10)
+
+
+### Features
+
+* **docker:** created dockerfile ([09b9d3c](https://github.com/bitsneak/DiscordSchoolBot/commit/09b9d3c111188dc102b4b900bc15fa420f4102e6))
+
 ## 1.1.1 (2025-01-31)
 
 
