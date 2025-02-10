@@ -4,13 +4,27 @@ on:
   push:
     branches:
       - main
-    paths:
-      - docker/Dockerfile
+    paths-ignore:
+      - .github/**
+      - LICENSE
+      - CHANGELOG.md
+      - CODEOWNERS
+      - CODE_OF_CONDUCT.md
+      - CONTRIBUTING.md
+      - README.md
+      - SECURITY.md
   pull_request:
     branches:
       - main
-    paths:
-      - docker/Dockerfile
+    paths-ignore:
+      - .github/**
+      - LICENSE
+      - CHANGELOG.md
+      - CODEOWNERS
+      - CODE_OF_CONDUCT.md
+      - CONTRIBUTING.md
+      - README.md
+      - SECURITY.md
   workflow_dispatch:
 
 jobs:
