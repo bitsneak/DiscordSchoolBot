@@ -26,4 +26,3 @@ jobs:
         with:
           context: docker
           push: false
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}:latest
