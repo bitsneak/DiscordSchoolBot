@@ -1,3 +1,10 @@
+## 1.2.1 (2025-02-10)
+
+
+### Bug Fixes
+
+* **docker:** now running with h2 ([6ad36f3](https://github.com/bitsneak/DiscordSchoolBot/commit/6ad36f38caeb2e92fdb43b036717db6d6b9fce8b))
+
 ## 1.2.0 (2025-02-10)
 
 
