@@ -1,8 +1,6 @@
 services:
   bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: bitsneak/discord-school-bot:latest
     restart: unless-stopped
     env_file: ../.env
     ports:
