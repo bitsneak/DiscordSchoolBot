@@ -1,3 +1,10 @@
+## 1.2.2 (2025-02-10)
+
+
+### Bug Fixes
+
+* **docker push:** file extension ([a0fd438](https://github.com/bitsneak/DiscordSchoolBot/commit/a0fd43857f94a96399ddabea27dd2a7af1d40556))
+
 ## 1.2.1 (2025-02-10)
 
 
