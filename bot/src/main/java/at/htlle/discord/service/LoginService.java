@@ -61,7 +61,11 @@ public class LoginService {
         }
 
         String verificationCode = verificationService.generateVerificationCode(verificationClient);
-        mailService.sendVerificationEmail(email, verificationCode);
+        if (!mailService.sendVerificationEmail(email, verificationCode)) {
+            discordUtil.sendPrivateMessage(verificationClient.getUser(), "Failed to send verification email. Server error.");
+            return false;
+        }
+
         verificationClient.getClient().setEmail(email);
         verificationClient.getClient().setDiscordName(verificationClient.getUser().getName());
 

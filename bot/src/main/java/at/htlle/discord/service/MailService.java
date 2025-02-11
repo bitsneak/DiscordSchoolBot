@@ -19,24 +19,26 @@ public class MailService
     @Value("${spring.mail.username}")
     private String from;
 
-    public void sendVerificationEmail(String email, String verificationCode)
+    public boolean sendVerificationEmail(String email, String verificationCode)
     {
         logger.info("Preparing to send verification email to: {}", email);
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(email);
-        message.setSubject("Email Verification - Schul-Discord-Server");
+        message.setSubject("Email Verification - School-Discord-Server");
         message.setText("Your verification code is: " + verificationCode);
 
         try
         {
             mailSender.send(message);
             logger.info("Successfully sent verification email to: {}", email);
+            return true;
         }
         catch (Exception e)
         {
             logger.error("Failed to send verification email to: {}. Error: {}", email, e.getMessage());
+            return false;
         }
     }
 }
